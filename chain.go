@@ -47,8 +47,10 @@ func (l *link) supervise() {
 	cancel()
 }
 
-// Chain provides "chain of responsibility". Ascendants always
-// opens before descendants and closes after
+// Chain composes chain of components. Ascendants always opens before
+// descendants and closes after. Chain "Wait" blocs until all chain components
+// are closed or error in at least in one components. On error whole chain will
+// be closed and "Wait" will return first error.
 type Chain struct {
 	ctx context.Context
 	cancel context.CancelFunc
@@ -69,7 +71,7 @@ func NewChain(ctx context.Context, components ...Component) (c *Chain) {
 }
 
 func (c *Chain) Open() (err error) {
-	c.wg.Add(1)
+	//c.wg.Add(1)
 
 	background := context.Background()
 	var ascendant *link
@@ -96,7 +98,7 @@ func (c *Chain) Open() (err error) {
 		if ascendant != nil {
 			ascendant.cancel()
 		}
-		c.wg.Done()
+		//c.wg.Done()
 	}()
 	return
 }

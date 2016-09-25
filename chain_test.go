@@ -11,7 +11,7 @@ import (
 func TestChain_Empty(t *testing.T) {
 	c := supervisor.NewChain(context.TODO())
 	c.Open()
-	c.Close()
+	//c.Close()
 	c.Wait()
 }
 

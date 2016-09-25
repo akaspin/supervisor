@@ -5,8 +5,10 @@ import (
 	"sync"
 )
 
-// Group provides "group of responsibility". Group will crash if
-// one of group is crashed.
+// Group composes group of components. All component will be opened and
+// closed together. Group "Wait" blocs until all components in chain are closed
+// or error in at least in one components. On error whole group will be
+// closed and "Wait" will return first error.
 type Group struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -32,11 +34,11 @@ func NewGroup(ctx context.Context, components ...Component) (g *Group) {
 }
 
 func (g *Group) Open() (err error) {
-	g.wg.Add(1)
-	go func() {
-		<-g.ctx.Done()
-		g.wg.Done()
-	}()
+	//g.wg.Add(1)
+	//go func() {
+	//	<-g.ctx.Done()
+	//	g.wg.Done()
+	//}()
 
 	for _, component := range g.components {
 		if err = component.Open(); err != nil {

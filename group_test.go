@@ -63,7 +63,7 @@ func (c *crashable) Crash(err error) {
 func TestGroup_Empty(t *testing.T) {
 	g := supervisor.NewGroup(context.TODO())
 	g.Open()
-	g.Close()
+	//g.Close()
 	g.Wait()
 }
 
