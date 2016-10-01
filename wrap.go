@@ -10,7 +10,7 @@ type Wrapped struct {
 	cancel context.CancelFunc
 	wg *sync.WaitGroup
 	fn func() error
-	trap *trap
+	trap *Trap
 }
 
 func NewWrapped(ctx context.Context, fn func() error) (w *Wrapped) {
@@ -40,7 +40,7 @@ func (w *Wrapped) Open() (err error) {
 			select {
 			case err := <-trackCh:
 				if err != nil {
-					w.trap.trapErr(err)
+					w.trap.Catch(err)
 				}
 				w.cancel()
 			case <-w.ctx.Done():

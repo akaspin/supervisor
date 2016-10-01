@@ -8,7 +8,7 @@ import (
 
 type link struct {
 	ascendant *link
-	trap *trap
+	trap *Trap
 	wg *sync.WaitGroup
 
 	component Component
@@ -34,7 +34,7 @@ func (l *link) supervise() {
 			case <-l.ctx.Done():
 				// external close
 				if err := l.component.Close(); err != nil {
-					l.trap.trapErr(err)
+					l.trap.Catch(err)
 				}
 				continue LOOP
 			}
@@ -42,7 +42,7 @@ func (l *link) supervise() {
 	}()
 
 	if err := l.component.Wait(); err != nil {
-		l.trap.trapErr(err)
+		l.trap.Catch(err)
 	}
 	cancel()
 }
@@ -57,7 +57,7 @@ type Chain struct {
 	wg *sync.WaitGroup
 
 	components []Component
-	trap *trap
+	trap *Trap
 }
 
 func NewChain(ctx context.Context, components ...Component) (c *Chain) {

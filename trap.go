@@ -5,28 +5,30 @@ import (
 	"context"
 )
 
-type trap struct {
+
+type Trap struct {
 	cancel context.CancelFunc
 	err error
 	errMu *sync.Mutex
+
 }
 
-func newTrap(cancel context.CancelFunc) (t *trap) {
-	t = &trap{
+func newTrap(cancel context.CancelFunc) (t *Trap) {
+	t = &Trap{
 		cancel: cancel,
 		errMu: &sync.Mutex{},
 	}
 	return
 }
 
-func (t *trap) Err() (err error) {
+func (t *Trap) Err() (err error) {
 	t.errMu.Lock()
 	defer t.errMu.Unlock()
 	err = t.err
 	return
 }
 
-func (t *trap) trapErr(err error) {
+func (t *Trap) Catch(err error) {
 	t.errMu.Lock()
 	defer t.errMu.Unlock()
 	if t.err == nil {

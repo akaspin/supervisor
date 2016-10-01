@@ -17,7 +17,7 @@ type Group struct {
 	errMu   *sync.Mutex
 	err        error
 
-	trap *trap
+	trap *Trap
 
 	components []Component
 }
@@ -42,7 +42,7 @@ func (g *Group) Open() (err error) {
 
 	for _, component := range g.components {
 		if err = component.Open(); err != nil {
-			g.trap.trapErr(err)
+			g.trap.Catch(err)
 			return
 		}
 		g.wg.Add(1)
@@ -69,12 +69,12 @@ func (g *Group) supervise(component Component) {
 	go func() {
 		<-ctx.Done()
 		if err := component.Close(); err != nil {
-			g.trap.trapErr(err)
+			g.trap.Catch(err)
 		}
 	}()
 
 	if err := component.Wait(); err != nil {
-		g.trap.trapErr(err)
+		g.trap.Catch(err)
 	}
 	cancel()
 }
