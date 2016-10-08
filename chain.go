@@ -21,7 +21,6 @@ func (l *link) supervise() {
 
 	// set upstream watchdog
 	go func() {
-		defer l.wg.Done()
 		LOOP:
 		for {
 			select {
@@ -39,6 +38,7 @@ func (l *link) supervise() {
 				continue LOOP
 			}
 		}
+		l.wg.Done()
 	}()
 
 	if err := l.component.Wait(); err != nil {
