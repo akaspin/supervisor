@@ -19,7 +19,7 @@ func NewWrapped(ctx context.Context, fn func() error) (w *Wrapped) {
 		fn: fn,
 	}
 	w.ctx, w.cancel = context.WithCancel(ctx)
-	w.trap = newTrap(w.cancel)
+	w.trap = NewTrap(w.cancel)
 	return
 }
 

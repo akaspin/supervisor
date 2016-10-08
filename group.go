@@ -29,7 +29,7 @@ func NewGroup(ctx context.Context, components ...Component) (g *Group) {
 		components: components,
 	}
 	g.ctx, g.cancel = context.WithCancel(ctx)
-	g.trap = newTrap(g.cancel)
+	g.trap = NewTrap(g.cancel)
 	return
 }
 

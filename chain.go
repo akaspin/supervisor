@@ -66,7 +66,7 @@ func NewChain(ctx context.Context, components ...Component) (c *Chain) {
 		components: components,
 	}
 	c.ctx, c.cancel = context.WithCancel(ctx)
-	c.trap = newTrap(c.cancel)
+	c.trap = NewTrap(c.cancel)
 	return
 }
 

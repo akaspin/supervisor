@@ -10,10 +10,9 @@ type Trap struct {
 	cancel context.CancelFunc
 	err error
 	errMu *sync.Mutex
-
 }
 
-func newTrap(cancel context.CancelFunc) (t *Trap) {
+func NewTrap(cancel context.CancelFunc) (t *Trap) {
 	t = &Trap{
 		cancel: cancel,
 		errMu: &sync.Mutex{},
