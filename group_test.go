@@ -2,7 +2,6 @@ package supervisor_test
 
 import (
 	"testing"
-	"sync"
 	"context"
 	"github.com/akaspin/supervisor"
 	"github.com/stretchr/testify/assert"
@@ -11,46 +10,45 @@ import (
 )
 
 type crashable struct {
-	ctx context.Context
-	cancel context.CancelFunc
+	*supervisor.Control
 
-	openC *int64
-	doneC *int64
-	waitC *int64
-	wg *sync.WaitGroup
-	err error
+	openCn *int64
+	closeCn *int64
+	doneCn *int64
+	waitCn *int64
+	err    error
 }
 
-func newCrashable(openC, doneC, waitC *int64) (c *crashable) {
+func newCrashable(openCn, closeCn, doneCn, waitCn *int64) (c *crashable) {
 	c = &crashable{
-		openC: openC,
-		doneC: doneC,
-		waitC: waitC,
-		wg: &sync.WaitGroup{},
+		Control: supervisor.NewControl(context.TODO()),
+		openCn: openCn,
+		closeCn: closeCn,
+		doneCn: doneCn,
+		waitCn: waitCn,
 	}
-	c.ctx, c.cancel = context.WithCancel(context.TODO())
 	return
 }
 
 func (c *crashable) Open() (err error) {
-	c.wg.Add(1)
 	go func() {
-		<-c.ctx.Done()
-		c.wg.Done()
-		atomic.AddInt64(c.doneC, 1)
+		<-c.Ctx().Done()
+		atomic.AddInt64(c.doneCn, 1)
 	}()
-	atomic.AddInt64(c.openC, 1)
+	c.Control.Open()
+	atomic.AddInt64(c.openCn, 1)
 	return
 }
 
 func (c *crashable) Close() (err error) {
-	c.cancel()
+	c.Control.Close()
+	atomic.AddInt64(c.closeCn, 1)
 	return
 }
 
 func (c *crashable) Wait() (err error) {
-	c.wg.Wait()
-	atomic.AddInt64(c.waitC, 1)
+	c.Control.Wait()
+	atomic.AddInt64(c.waitCn, 1)
 	err = c.err
 	return
 }
@@ -68,27 +66,27 @@ func TestGroup_Empty(t *testing.T) {
 }
 
 func TestGroup_Regular(t *testing.T) {
-	var openC, doneC, waitC int64
+	var openCn, closeCn, doneCn, waitCn int64
 	g := supervisor.NewGroup(
 		context.TODO(),
-		newCrashable(&openC, &doneC, &waitC),
-		newCrashable(&openC, &doneC, &waitC),
-		newCrashable(&openC, &doneC, &waitC),
+		newCrashable(&openCn, &closeCn, &doneCn, &waitCn),
+		newCrashable(&openCn, &closeCn, &doneCn, &waitCn),
+		newCrashable(&openCn, &closeCn, &doneCn, &waitCn),
 	)
 	g.Open()
 	g.Close()
 	err := g.Wait()
 	assert.NoError(t, err)
-	assert.Equal(t, []int64{3, 3, 3}, []int64{openC, doneC, waitC})
+	assert.Equal(t, []int64{3, 3, 3, 3}, []int64{openCn, closeCn, doneCn, waitCn})
 }
 
 func TestGroup_Crash(t *testing.T) {
-	var openC, doneC, waitC int64
-	messy := newCrashable(&openC, &doneC, &waitC)
+	var openCn, closeCn, doneCn, waitCn int64
+	messy := newCrashable(&openCn, &closeCn, &doneCn, &waitCn)
 	g := supervisor.NewGroup(
 		context.TODO(),
-		newCrashable(&openC, &doneC, &waitC),
-		newCrashable(&openC, &doneC, &waitC),
+		newCrashable(&openCn, &closeCn, &doneCn, &waitCn),
+		newCrashable(&openCn, &closeCn, &doneCn, &waitCn),
 		messy,
 	)
 	g.Open()
@@ -96,5 +94,5 @@ func TestGroup_Crash(t *testing.T) {
 	err := g.Wait()
 	assert.Error(t, err)
 	assert.Equal(t, "err", err.Error())
-	assert.Equal(t, []int64{3, 3, 3}, []int64{openC, doneC, waitC})
+	assert.Equal(t, []int64{3, 4, 3, 3}, []int64{openCn, closeCn, doneCn, waitCn})
 }

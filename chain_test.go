@@ -17,10 +17,11 @@ type chainableSig struct {
 type chainable struct {
 	ctx context.Context
 	cancel context.CancelFunc
+	wg *sync.WaitGroup
+
 	index int
 
 	ch chan chainableSig
-	wg *sync.WaitGroup
 	err error
 }
 
