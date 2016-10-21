@@ -3,6 +3,12 @@ package supervisor
 import (
 	"context"
 	"sync"
+	"time"
+	"errors"
+)
+
+var (
+	CloseTimeoutExceeded = errors.New("close timeout exceeded")
 )
 
 // Control provides ability to turn any type to supervisor component
@@ -12,29 +18,35 @@ type Control struct {
 	// Cancel cancels control context
 	Cancel context.CancelFunc
 
-	// internal wait group
-	wg     *sync.WaitGroup
-
-	// bounded wait group
+	closeTimeout time.Duration
 	boundedWg *sync.WaitGroup
+
+	closeCtx context.Context
+	closeCancel context.CancelFunc
 }
 
 func NewControl(ctx context.Context) (c *Control) {
+	c = NewControlTimeout(ctx, 0)
+	return
+}
+
+func NewControlTimeout(ctx context.Context, timeout time.Duration) (c *Control) {
 	c = &Control{
-		wg: &sync.WaitGroup{},
+		closeTimeout: timeout,
 		boundedWg: &sync.WaitGroup{},
 	}
 	c.ctx, c.Cancel = context.WithCancel(ctx)
+	c.closeCtx, c.closeCancel = context.WithCancel(context.Background())
 	return
 }
 
 func (c *Control) Open() (err error) {
-	c.wg.Add(1)
 	go func() {
 		<-c.ctx.Done()
 		c.boundedWg.Wait()
-		c.wg.Done()
+		c.closeCancel()
 	}()
+
 	return
 }
 
@@ -44,7 +56,17 @@ func (c *Control) Close() (err error) {
 }
 
 func (c *Control) Wait() (err error) {
-	c.wg.Wait()
+	var timeoutChan <-chan time.Time
+	if c.closeTimeout > 0 {
+		timer := time.NewTimer(c.closeTimeout)
+		defer timer.Stop()
+		timeoutChan = timer.C
+	}
+	select {
+	case <-c.closeCtx.Done():
+	case <-timeoutChan:
+		err = CloseTimeoutExceeded
+	}
 	return
 }
 
