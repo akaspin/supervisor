@@ -5,15 +5,14 @@ import (
 	"sync"
 )
 
-
 type link struct {
 	ascendant *link
-	trap *Trap
-	wg *sync.WaitGroup
+	trap      *Trap
+	wg        *sync.WaitGroup
 
 	component Component
-	ctx context.Context
-	cancel context.CancelFunc
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 func (l *link) supervise() {
@@ -21,22 +20,19 @@ func (l *link) supervise() {
 
 	// set upstream watchdog
 	go func() {
-		LOOP:
-		for {
-			select {
-			case <-ctx.Done():
-				// wait reached
-				if l.ascendant != nil {
-					l.ascendant.cancel()
-				}
-				break LOOP
-			case <-l.ctx.Done():
-				// external close
-				if err := l.component.Close(); err != nil {
-					l.trap.Catch(err)
-				}
-				continue LOOP
-			}
+		// wait reached
+		<-ctx.Done()
+		if l.ascendant != nil {
+			l.ascendant.cancel()
+		}
+		l.wg.Done()
+	}()
+
+	go func() {
+		// external close
+		<-l.ctx.Done()
+		if err := l.component.Close(); err != nil {
+			l.trap.Catch(err)
 		}
 		l.wg.Done()
 	}()
@@ -52,17 +48,17 @@ func (l *link) supervise() {
 // are closed or error in at least in one components. On error whole chain will
 // be closed and "Wait" will return first error.
 type Chain struct {
-	ctx context.Context
+	ctx    context.Context
 	cancel context.CancelFunc
-	wg *sync.WaitGroup
+	wg     *sync.WaitGroup
 
 	components []Component
-	trap *Trap
+	trap       *Trap
 }
 
 func NewChain(ctx context.Context, components ...Component) (c *Chain) {
 	c = &Chain{
-		wg: &sync.WaitGroup{},
+		wg:         &sync.WaitGroup{},
 		components: components,
 	}
 	c.ctx, c.cancel = context.WithCancel(ctx)
@@ -78,11 +74,11 @@ func (c *Chain) Open() (err error) {
 			c.Close()
 			return
 		}
-		c.wg.Add(1)
+		c.wg.Add(2)
 		l := &link{
 			ascendant: ascendant,
-			trap: c.trap,
-			wg: c.wg,
+			trap:      c.trap,
+			wg:        c.wg,
 			component: component,
 		}
 		l.ctx, l.cancel = context.WithCancel(background)
