@@ -6,7 +6,7 @@ import (
 )
 
 // Group composes group of components. All component will be opened and
-// closed together. Group "Wait" blocs until all components in chain are closed
+// closed together. Group "Wait" blocs until all components in group are closed
 // or error in at least in one components. On error whole group will be
 // closed and "Wait" will return first error.
 type Group struct {
@@ -18,7 +18,6 @@ type Group struct {
 	err        error
 
 	trap *Trap
-
 	components []Component
 }
 
@@ -34,12 +33,6 @@ func NewGroup(ctx context.Context, components ...Component) (g *Group) {
 }
 
 func (g *Group) Open() (err error) {
-	//g.wg.Add(1)
-	//go func() {
-	//	<-g.ctx.Done()
-	//	g.wg.Done()
-	//}()
-
 	for _, component := range g.components {
 		if err = component.Open(); err != nil {
 			g.trap.Catch(err)

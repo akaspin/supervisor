@@ -5,13 +5,14 @@ import (
 	"context"
 )
 
-
+// Trap can be used to cancel specific context on error
 type Trap struct {
 	cancel context.CancelFunc
 	err error
 	errMu *sync.Mutex
 }
 
+// NewTrap returns Trap bounded to specific context cancel
 func NewTrap(cancel context.CancelFunc) (t *Trap) {
 	t = &Trap{
 		cancel: cancel,
@@ -20,6 +21,7 @@ func NewTrap(cancel context.CancelFunc) (t *Trap) {
 	return
 }
 
+// Err returns first error
 func (t *Trap) Err() (err error) {
 	t.errMu.Lock()
 	defer t.errMu.Unlock()
@@ -27,6 +29,7 @@ func (t *Trap) Err() (err error) {
 	return
 }
 
+// Catch cancel bounded context on non-nil error
 func (t *Trap) Catch(err error) {
 	t.errMu.Lock()
 	defer t.errMu.Unlock()

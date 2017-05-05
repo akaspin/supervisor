@@ -71,8 +71,6 @@ func NewChain(ctx context.Context, components ...Component) (c *Chain) {
 }
 
 func (c *Chain) Open() (err error) {
-	//c.wg.Add(1)
-
 	background := context.Background()
 	var ascendant *link
 	for _, component := range c.components {
@@ -98,7 +96,6 @@ func (c *Chain) Open() (err error) {
 		if ascendant != nil {
 			ascendant.cancel()
 		}
-		//c.wg.Done()
 	}()
 	return
 }
