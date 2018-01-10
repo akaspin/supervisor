@@ -77,7 +77,12 @@ func TestGroup_Regular(t *testing.T) {
 	g.Close()
 	err := g.Wait()
 	assert.NoError(t, err)
-	assert.Equal(t, []int64{3, 3, 3, 3}, []int64{openCn, closeCn, doneCn, waitCn})
+	assert.Equal(t, []int64{3, 3, 3, 3}, []int64{
+		atomic.LoadInt64(&openCn),
+		atomic.LoadInt64(&closeCn),
+		atomic.LoadInt64(&doneCn),
+		atomic.LoadInt64(&waitCn),
+	})
 }
 
 func TestGroup_Crash(t *testing.T) {
@@ -94,5 +99,11 @@ func TestGroup_Crash(t *testing.T) {
 	err := g.Wait()
 	assert.Error(t, err)
 	assert.Equal(t, "err", err.Error())
-	assert.Equal(t, []int64{3, 4, 3, 3}, []int64{openCn, closeCn, doneCn, waitCn})
+	assert.Equal(t, []int64{3, 4, 3, 3}, []int64{
+		atomic.LoadInt64(&openCn),
+		atomic.LoadInt64(&closeCn),
+		atomic.LoadInt64(&doneCn),
+		atomic.LoadInt64(&waitCn),
+	})
+	//assert.Equal(t, []int64{3, 4, 3, 3}, []int64{openCn, closeCn, doneCn, waitCn})
 }
