@@ -14,9 +14,7 @@ var (
 // Control provides ability to turn any type to supervisor component
 type Control struct {
 	ctx    context.Context
-
-	// Cancel cancels control context
-	Cancel context.CancelFunc
+	cancel context.CancelFunc
 
 	closeTimeout time.Duration
 	boundedWg sync.WaitGroup
@@ -34,7 +32,7 @@ func NewControlTimeout(ctx context.Context, timeout time.Duration) (c *Control) 
 	c = &Control{
 		closeTimeout: timeout,
 	}
-	c.ctx, c.Cancel = context.WithCancel(ctx)
+	c.ctx, c.cancel = context.WithCancel(ctx)
 	c.closeCtx, c.closeCancel = context.WithCancel(context.Background())
 	return
 }
@@ -50,7 +48,7 @@ func (c *Control) Open() (err error) {
 }
 
 func (c *Control) Close() (err error) {
-	c.Cancel()
+	c.cancel()
 	return
 }
 

@@ -105,5 +105,4 @@ func TestGroup_Crash(t *testing.T) {
 		atomic.LoadInt64(&doneCn),
 		atomic.LoadInt64(&waitCn),
 	})
-	//assert.Equal(t, []int64{3, 4, 3, 3}, []int64{openCn, closeCn, doneCn, waitCn})
 }
