@@ -9,7 +9,7 @@ import (
 )
 
 func TestNewControlTimeout(t *testing.T) {
-	ctl := supervisor.NewControlTimeout(context.TODO(), time.Millisecond * 100)
+	ctl := supervisor.NewControlTimeout(context.Background(), time.Millisecond * 100)
 	ctl.Open()
 
 	ctl.Acquire()
@@ -17,5 +17,5 @@ func TestNewControlTimeout(t *testing.T) {
 	ctl.Close()
 	err := ctl.Wait()
 	assert.Error(t, err)
-	assert.Equal(t, err, supervisor.CloseTimeoutExceeded)
+	assert.Equal(t, err, supervisor.ErrCloseTimeoutExceeded)
 }

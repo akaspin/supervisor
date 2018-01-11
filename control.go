@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	CloseTimeoutExceeded = errors.New("close timeout exceeded")
+	ErrCloseTimeoutExceeded = errors.New("close timeout exceeded")
 )
 
 // Control provides ability to turn any type to supervisor component
@@ -62,7 +62,7 @@ func (c *Control) Wait() (err error) {
 	select {
 	case <-c.closeCtx.Done():
 	case <-timeoutChan:
-		err = CloseTimeoutExceeded
+		err = ErrCloseTimeoutExceeded
 	}
 	return
 }
