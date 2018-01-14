@@ -12,4 +12,3 @@ type Component interface {
 	// Wait blocks until component is closed or error occurs
 	Wait() (err error)
 }
-

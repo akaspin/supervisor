@@ -14,7 +14,7 @@ type Control struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	closeCtx context.Context
+	closeCtx    context.Context
 	closeCancel context.CancelFunc
 }
 
@@ -48,4 +48,3 @@ func (c *Control) Wait() (err error) {
 func (c *Control) Ctx() context.Context {
 	return c.ctx
 }
-

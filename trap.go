@@ -1,22 +1,22 @@
 package supervisor
 
 import (
-	"sync"
 	"context"
+	"sync"
 )
 
 // Trap can be used to cancel specific context on error
 type Trap struct {
 	cancel context.CancelFunc
-	err error
-	errMu sync.Mutex
+	err    error
+	errMu  sync.Mutex
 }
 
 // NewTrap returns Trap bounded to specific context cancel
 func NewTrap(cancel context.CancelFunc) (t *Trap) {
 	t = &Trap{
 		cancel: cancel,
-		errMu: sync.Mutex{},
+		errMu:  sync.Mutex{},
 	}
 	return
 }

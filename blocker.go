@@ -15,17 +15,29 @@ type Blocker interface {
 	Wait() (err error)
 }
 
+type CompositeBlock struct {
+	blocks []Blocker
+}
+
+func (*CompositeBlock) Block() (err error) {
+	panic("implement me")
+}
+
+func (*CompositeBlock) Wait() (err error) {
+	panic("implement me")
+}
+
 // TimeoutBlock blocks until provided Context is closed or timeout reached
 type TimeoutBlock struct {
-	baseCtx context.Context
-	timeout time.Duration
+	baseCtx  context.Context
+	timeout  time.Duration
 	failChan chan struct{}
 }
 
 func NewTimeoutBlock(ctx context.Context, timeout time.Duration) (b *TimeoutBlock) {
 	b = &TimeoutBlock{
-		baseCtx: ctx,
-		timeout: timeout,
+		baseCtx:  ctx,
+		timeout:  timeout,
 		failChan: make(chan struct{}),
 	}
 	return
@@ -48,4 +60,3 @@ func (b *TimeoutBlock) Wait() (err error) {
 	}
 	return err
 }
-
