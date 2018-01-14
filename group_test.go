@@ -1,31 +1,31 @@
 package supervisor_test
 
 import (
-	"testing"
 	"context"
+	"errors"
 	"github.com/akaspin/supervisor"
 	"github.com/stretchr/testify/assert"
-	"errors"
 	"sync/atomic"
+	"testing"
 )
 
 type crashable struct {
 	*supervisor.Control
 
-	openCn *int64
+	openCn  *int64
 	closeCn *int64
-	doneCn *int64
-	waitCn *int64
-	err    error
+	doneCn  *int64
+	waitCn  *int64
+	err     error
 }
 
 func newCrashable(openCn, closeCn, doneCn, waitCn *int64) (c *crashable) {
 	c = &crashable{
 		Control: supervisor.NewControl(context.TODO()),
-		openCn: openCn,
+		openCn:  openCn,
 		closeCn: closeCn,
-		doneCn: doneCn,
-		waitCn: waitCn,
+		doneCn:  doneCn,
+		waitCn:  waitCn,
 	}
 	return
 }
@@ -105,5 +105,4 @@ func TestGroup_Crash(t *testing.T) {
 		atomic.LoadInt64(&doneCn),
 		atomic.LoadInt64(&waitCn),
 	})
-	//assert.Equal(t, []int64{3, 4, 3, 3}, []int64{openCn, closeCn, doneCn, waitCn})
 }

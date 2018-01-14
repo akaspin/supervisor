@@ -6,11 +6,11 @@ import (
 )
 
 type Wrapped struct {
-	ctx context.Context
+	ctx    context.Context
 	cancel context.CancelFunc
-	wg *sync.WaitGroup
-	fn func() error
-	trap *Trap
+	wg     *sync.WaitGroup
+	fn     func() error
+	trap   *Trap
 }
 
 func NewWrapped(ctx context.Context, fn func() error) (w *Wrapped) {
@@ -62,4 +62,3 @@ func (w *Wrapped) Wait() (err error) {
 	err = w.trap.Err()
 	return
 }
-

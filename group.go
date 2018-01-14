@@ -10,14 +10,14 @@ import (
 // or error in at least in one components. On error whole group will be
 // closed and "Wait" will return first error.
 type Group struct {
-	ctx        context.Context
-	cancel     context.CancelFunc
-	wg         sync.WaitGroup
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 
-	errMu   sync.Mutex
-	err        error
+	errMu sync.Mutex
+	err   error
 
-	trap *Trap
+	trap       *Trap
 	components []Component
 }
 

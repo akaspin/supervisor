@@ -1,11 +1,11 @@
 package supervisor_test
 
 import (
-	"testing"
-	"github.com/akaspin/supervisor"
 	"context"
-	"github.com/stretchr/testify/assert"
 	"errors"
+	"github.com/akaspin/supervisor"
+	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestWrapped_OK(t *testing.T) {
@@ -29,5 +29,3 @@ func TestWrapped_Err(t *testing.T) {
 	err := w.Wait()
 	assert.Error(t, err)
 }
-
-

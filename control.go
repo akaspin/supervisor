@@ -2,69 +2,46 @@ package supervisor
 
 import (
 	"context"
-	"sync"
-	"time"
-	"errors"
-)
-
-var (
-	CloseTimeoutExceeded = errors.New("close timeout exceeded")
 )
 
 // Control provides ability to turn any type to supervisor component
 type Control struct {
-	ctx    context.Context
-
-	// Cancel cancels control context
-	Cancel context.CancelFunc
-
-	closeTimeout time.Duration
-	boundedWg sync.WaitGroup
-
-	closeCtx context.Context
-	closeCancel context.CancelFunc
+	baseCtx context.Context // base context
+	ctx     context.Context
+	cancel  context.CancelFunc
+	block   *CompositeBlock
 }
 
-func NewControl(ctx context.Context) (c *Control) {
-	c = NewControlTimeout(ctx, 0)
-	return
-}
-
-func NewControlTimeout(ctx context.Context, timeout time.Duration) (c *Control) {
+// NewControl returns new Control. Control assumes provided as master. If
+// provided context is closed Control.Wait returns immediately without errors.
+// Control evaluates all provided blockers in CompositeBlock.
+func NewControl(ctx context.Context, blocks ...Blocker) (c *Control) {
 	c = &Control{
-		closeTimeout: timeout,
+		baseCtx: ctx,
+		block:   NewCompositeBlock(blocks...),
 	}
-	c.ctx, c.Cancel = context.WithCancel(ctx)
-	c.closeCtx, c.closeCancel = context.WithCancel(context.Background())
+	c.ctx, c.cancel = context.WithCancel(context.Background())
 	return
 }
 
 func (c *Control) Open() (err error) {
-	go func() {
-		<-c.ctx.Done()
-		c.boundedWg.Wait()
-		c.closeCancel()
-	}()
-
 	return
 }
 
+// Close closes control and attached Blockers
 func (c *Control) Close() (err error) {
-	c.Cancel()
+	c.cancel()
+	err = c.block.Close()
 	return
 }
 
+// Wait waits for attached blockers or master Context
 func (c *Control) Wait() (err error) {
-	var timeoutChan <-chan time.Time
-	if c.closeTimeout > 0 {
-		timer := time.NewTimer(c.closeTimeout)
-		defer timer.Stop()
-		timeoutChan = timer.C
-	}
 	select {
-	case <-c.closeCtx.Done():
-	case <-timeoutChan:
-		err = CloseTimeoutExceeded
+	case <-c.baseCtx.Done():
+		return
+	case <-c.ctx.Done():
+		err = c.block.Wait()
 	}
 	return
 }
@@ -73,13 +50,3 @@ func (c *Control) Wait() (err error) {
 func (c *Control) Ctx() context.Context {
 	return c.ctx
 }
-
-// Acquire increases internal lock counter
-func (c *Control) Acquire() {
-	c.boundedWg.Add(1)
-}
-
-func (c *Control) Release() {
-	c.boundedWg.Done()
-}
-
