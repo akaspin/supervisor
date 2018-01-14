@@ -7,7 +7,7 @@ type MultiError struct {
 func (e *MultiError) Error() (res string) {
 	for i, e1 := range e.Errs {
 		if i > 0 {
-			res += " : "
+			res += ","
 		}
 		res += e1.Error()
 	}

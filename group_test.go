@@ -5,104 +5,201 @@ import (
 	"errors"
 	"github.com/akaspin/supervisor"
 	"github.com/stretchr/testify/assert"
+	"strconv"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
-type crashable struct {
-	*supervisor.Control
-
-	openCn  *int64
-	closeCn *int64
-	doneCn  *int64
-	waitCn  *int64
-	err     error
+type testingCounters struct {
+	openCn  int32
+	closeCn int32
+	waitCn  int32
 }
 
-func newCrashable(openCn, closeCn, doneCn, waitCn *int64) (c *crashable) {
-	c = &crashable{
-		Control: supervisor.NewControl(context.TODO()),
-		openCn:  openCn,
-		closeCn: closeCn,
-		doneCn:  doneCn,
-		waitCn:  waitCn,
+type testingComponent struct {
+	name     string
+	counters testingCounters
+	errOpen  error
+	errClose error
+	errWait  error
+}
+
+func (c *testingComponent) Open() (err error) {
+	atomic.AddInt32(&c.counters.openCn, 1)
+	err = c.errOpen
+	return
+}
+
+func (c *testingComponent) Close() (err error) {
+	atomic.AddInt32(&c.counters.closeCn, 1)
+	err = c.errClose
+	return
+}
+
+func (c *testingComponent) Wait() (err error) {
+	atomic.AddInt32(&c.counters.waitCn, 1)
+	err = c.errWait
+	return
+}
+
+func assertStates(t *testing.T, expects []testingCounters, components []*testingComponent) {
+	t.Helper()
+	for i, c := range components {
+		openOk := expects[i].openCn == -1 || atomic.LoadInt32(&c.counters.openCn) == expects[i].openCn
+		closeOk := expects[i].closeCn == -1 || atomic.LoadInt32(&c.counters.closeCn) == expects[i].closeCn
+		waitOk := expects[i].waitCn == -1 || atomic.LoadInt32(&c.counters.waitCn) == expects[i].waitCn
+		if !openOk || !closeOk || !waitOk {
+			t.Errorf("%d:%s: %v != %v", i, c.name, expects[i], c.counters)
+		}
 	}
-	return
 }
 
-func (c *crashable) Open() (err error) {
-	go func() {
-		<-c.Ctx().Done()
-		atomic.AddInt64(c.doneCn, 1)
-	}()
-	c.Control.Open()
-	atomic.AddInt64(c.openCn, 1)
-	return
+func TestGroup1_Open(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			t.Parallel()
+			t.Run(`ok`, func(t *testing.T) {
+				c1 := &testingComponent{}
+				c2 := &testingComponent{}
+				group := supervisor.NewGroup(context.Background(), c1, c2)
+				assert.NoError(t, group.Open())
+
+				assertStates(t,
+					[]testingCounters{
+						{1, 0, -1},
+						{1, 0, -1},
+					},
+					[]*testingComponent{
+						c1, c2,
+					})
+			})
+			t.Run(`fail`, func(t *testing.T) {
+				c1 := &testingComponent{}
+				c2 := &testingComponent{
+					errOpen: errors.New("c2"),
+				}
+				group := supervisor.NewGroup(context.Background(), c1, c2)
+				assert.EqualError(t, group.Open(), "c2")
+
+				time.Sleep(time.Millisecond * 50)
+				assertStates(t,
+					[]testingCounters{
+						{1, 1, -1}, // first close should be called
+						{1, 0, 0},  // second wait should not be called
+					},
+					[]*testingComponent{
+						c1, c2,
+					})
+			})
+		})
+	}
+
 }
 
-func (c *crashable) Close() (err error) {
-	c.Control.Close()
-	atomic.AddInt64(c.closeCn, 1)
-	return
+func TestGroup1_Close(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			t.Parallel()
+			t.Run(`ok`, func(t *testing.T) {
+				c1 := &testingComponent{}
+				c2 := &testingComponent{}
+				group := supervisor.NewGroup(context.Background(), c1, c2)
+
+				assert.NoError(t, group.Open())
+				assert.NoError(t, group.Close())
+				assertStates(t,
+					[]testingCounters{
+						{1, 1, -1},
+						{1, 1, -1},
+					},
+					[]*testingComponent{
+						c1, c2,
+					})
+			})
+			t.Run(`fail`, func(t *testing.T) {
+				c1 := &testingComponent{}
+				c2 := &testingComponent{
+					errClose: errors.New("c2"),
+				}
+				group := supervisor.NewGroup(context.Background(), c1, c2)
+
+				assert.NoError(t, group.Open())
+				assert.EqualError(t, group.Close(), "c2")
+				assertStates(t,
+					[]testingCounters{
+						{1, 1, -1},
+						{1, 1, -1},
+					},
+					[]*testingComponent{
+						c1, c2,
+					})
+			})
+		})
+	}
 }
 
-func (c *crashable) Wait() (err error) {
-	c.Control.Wait()
-	atomic.AddInt64(c.waitCn, 1)
-	err = c.err
-	return
-}
+func TestGroup1_Wait(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			t.Parallel()
 
-func (c *crashable) Crash(err error) {
-	c.err = err
-	c.Close()
-}
+			t.Run(`ok`, func(t *testing.T) {
+				c1 := &testingComponent{}
+				c2 := &testingComponent{}
+				group := supervisor.NewGroup(context.Background(), c1, c2)
 
-func TestGroup_Empty(t *testing.T) {
-	g := supervisor.NewGroup(context.TODO())
-	g.Open()
-	//g.Close()
-	g.Wait()
-}
+				assert.NoError(t, group.Open())
+				assert.NoError(t, group.Close())
+				assert.NoError(t, group.Wait())
+				assertStates(t,
+					[]testingCounters{
+						{1, 1, 1},
+						{1, 1, 1},
+					},
+					[]*testingComponent{
+						c1, c2,
+					})
+			})
+			t.Run(`fail after close`, func(t *testing.T) {
+				c1 := &testingComponent{}
+				c2 := &testingComponent{
+					errWait: errors.New("c2"),
+				}
+				group := supervisor.NewGroup(context.Background(), c1, c2)
 
-func TestGroup_Regular(t *testing.T) {
-	var openCn, closeCn, doneCn, waitCn int64
-	g := supervisor.NewGroup(
-		context.TODO(),
-		newCrashable(&openCn, &closeCn, &doneCn, &waitCn),
-		newCrashable(&openCn, &closeCn, &doneCn, &waitCn),
-		newCrashable(&openCn, &closeCn, &doneCn, &waitCn),
-	)
-	g.Open()
-	g.Close()
-	err := g.Wait()
-	assert.NoError(t, err)
-	assert.Equal(t, []int64{3, 3, 3, 3}, []int64{
-		atomic.LoadInt64(&openCn),
-		atomic.LoadInt64(&closeCn),
-		atomic.LoadInt64(&doneCn),
-		atomic.LoadInt64(&waitCn),
-	})
-}
+				assert.NoError(t, group.Open())
+				assert.NoError(t, group.Close())
+				assert.EqualError(t, group.Wait(), "c2")
+				assertStates(t,
+					[]testingCounters{
+						{1, 1, 1},
+						{1, 1, 1},
+					},
+					[]*testingComponent{
+						c1, c2,
+					})
+			})
+			t.Run(`fail without close`, func(t *testing.T) {
+				c1 := &testingComponent{}
+				c2 := &testingComponent{
+					errWait: errors.New("c2"),
+				}
+				group := supervisor.NewGroup(context.Background(), c1, c2)
 
-func TestGroup_Crash(t *testing.T) {
-	var openCn, closeCn, doneCn, waitCn int64
-	messy := newCrashable(&openCn, &closeCn, &doneCn, &waitCn)
-	g := supervisor.NewGroup(
-		context.TODO(),
-		newCrashable(&openCn, &closeCn, &doneCn, &waitCn),
-		newCrashable(&openCn, &closeCn, &doneCn, &waitCn),
-		messy,
-	)
-	g.Open()
-	messy.Crash(errors.New("err"))
-	err := g.Wait()
-	assert.Error(t, err)
-	assert.Equal(t, "err", err.Error())
-	assert.Equal(t, []int64{3, 4, 3, 3}, []int64{
-		atomic.LoadInt64(&openCn),
-		atomic.LoadInt64(&closeCn),
-		atomic.LoadInt64(&doneCn),
-		atomic.LoadInt64(&waitCn),
-	})
+				assert.NoError(t, group.Open())
+				assert.EqualError(t, group.Wait(), "c2")
+
+				time.Sleep(time.Millisecond * 100)
+				assertStates(t,
+					[]testingCounters{
+						{1, 1, 1},
+						{1, 1, 1},
+					},
+					[]*testingComponent{
+						c1, c2,
+					})
+			})
+		})
+	}
 }
