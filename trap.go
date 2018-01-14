@@ -9,14 +9,14 @@ import (
 type Trap struct {
 	cancel context.CancelFunc
 	err error
-	errMu *sync.Mutex
+	errMu sync.Mutex
 }
 
 // NewTrap returns Trap bounded to specific context cancel
 func NewTrap(cancel context.CancelFunc) (t *Trap) {
 	t = &Trap{
 		cancel: cancel,
-		errMu: &sync.Mutex{},
+		errMu: sync.Mutex{},
 	}
 	return
 }

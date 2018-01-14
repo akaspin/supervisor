@@ -2,8 +2,6 @@ package supervisor
 
 import (
 	"context"
-	"sync"
-	"time"
 	"errors"
 )
 
@@ -16,22 +14,12 @@ type Control struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	closeTimeout time.Duration
-	boundedWg sync.WaitGroup
-
 	closeCtx context.Context
 	closeCancel context.CancelFunc
 }
 
 func NewControl(ctx context.Context) (c *Control) {
-	c = NewControlTimeout(ctx, 0)
-	return
-}
-
-func NewControlTimeout(ctx context.Context, timeout time.Duration) (c *Control) {
-	c = &Control{
-		closeTimeout: timeout,
-	}
+	c = &Control{}
 	c.ctx, c.cancel = context.WithCancel(ctx)
 	c.closeCtx, c.closeCancel = context.WithCancel(context.Background())
 	return
@@ -40,7 +28,6 @@ func NewControlTimeout(ctx context.Context, timeout time.Duration) (c *Control) 
 func (c *Control) Open() (err error) {
 	go func() {
 		<-c.ctx.Done()
-		c.boundedWg.Wait()
 		c.closeCancel()
 	}()
 
@@ -53,31 +40,12 @@ func (c *Control) Close() (err error) {
 }
 
 func (c *Control) Wait() (err error) {
-	var timeoutChan <-chan time.Time
-	if c.closeTimeout > 0 {
-		timer := time.NewTimer(c.closeTimeout)
-		defer timer.Stop()
-		timeoutChan = timer.C
-	}
-	select {
-	case <-c.closeCtx.Done():
-	case <-timeoutChan:
-		err = ErrCloseTimeoutExceeded
-	}
+	<-c.closeCtx.Done()
 	return
 }
 
 // Ctx returns Control context
 func (c *Control) Ctx() context.Context {
 	return c.ctx
-}
-
-// Acquire increases internal lock counter
-func (c *Control) Acquire() {
-	c.boundedWg.Add(1)
-}
-
-func (c *Control) Release() {
-	c.boundedWg.Done()
 }
 
