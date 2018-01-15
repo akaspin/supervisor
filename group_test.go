@@ -3,202 +3,332 @@ package supervisor_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/akaspin/supervisor"
 	"github.com/stretchr/testify/assert"
 	"strconv"
 	"sync/atomic"
 	"testing"
-	"time"
 )
 
+const groupTestIterations = 10
+
 type testingCounters struct {
-	openCn  int32
-	closeCn int32
-	waitCn  int32
+	o int32
+	c int32
+	w int32
 }
 
 type testingComponent struct {
-	name     string
-	counters testingCounters
+	name string
+	testingCounters
 	errOpen  error
 	errClose error
 	errWait  error
+
+	closedChan chan struct{}
+}
+
+func newDummyComponent(name string, errOpen, errClose, errWait error) (c *testingComponent) {
+	c = &testingComponent{
+		name:       name,
+		errOpen:    errOpen,
+		errClose:   errClose,
+		errWait:    errWait,
+		closedChan: make(chan struct{}),
+	}
+	return
 }
 
 func (c *testingComponent) Open() (err error) {
-	atomic.AddInt32(&c.counters.openCn, 1)
+	atomic.AddInt32(&c.testingCounters.o, 1)
 	err = c.errOpen
 	return
 }
 
 func (c *testingComponent) Close() (err error) {
-	atomic.AddInt32(&c.counters.closeCn, 1)
+	atomic.AddInt32(&c.testingCounters.c, 1)
 	err = c.errClose
+	close(c.closedChan)
 	return
 }
 
 func (c *testingComponent) Wait() (err error) {
-	atomic.AddInt32(&c.counters.waitCn, 1)
+	atomic.AddInt32(&c.testingCounters.w, 1)
 	err = c.errWait
+	<-c.closedChan
 	return
 }
 
-func assertStates(t *testing.T, expects []testingCounters, components []*testingComponent) {
-	t.Helper()
+func (c *testingComponent) assertCounters(oc, cc, wc int32) (err error) {
+	openC := atomic.LoadInt32(&c.testingCounters.o)
+	closeC := atomic.LoadInt32(&c.testingCounters.c)
+	waitC := atomic.LoadInt32(&c.testingCounters.w)
+	oOk := oc == -1 || openC == oc
+	cOk := cc == -1 || closeC == cc
+	wOk := wc == -1 || waitC == wc
+	if !(oOk && cOk && wOk) {
+		err = fmt.Errorf("%s: open(%t)=%d:%d close(%t)=%d:%d wait(%t)=%d:%d", c.name,
+			oOk, oc, openC,
+			cOk, cc, closeC,
+			wOk, wc, waitC)
+	}
+	return
+}
+
+func assertComponents(components []*testingComponent, counters []testingCounters) (err error) {
 	for i, c := range components {
-		openOk := expects[i].openCn == -1 || atomic.LoadInt32(&c.counters.openCn) == expects[i].openCn
-		closeOk := expects[i].closeCn == -1 || atomic.LoadInt32(&c.counters.closeCn) == expects[i].closeCn
-		waitOk := expects[i].waitCn == -1 || atomic.LoadInt32(&c.counters.waitCn) == expects[i].waitCn
-		if !openOk || !closeOk || !waitOk {
-			t.Errorf("%d:%s: %v != %v", i, c.name, expects[i], c.counters)
+		if err1 := c.assertCounters(counters[i].o, counters[i].c, counters[i].w); err != nil {
+			err = supervisor.AppendError(err, err1)
 		}
 	}
+	return
 }
 
-func TestGroup1_Open(t *testing.T) {
-	for i := 0; i < 10; i++ {
+func TestGroup_Open(t *testing.T) {
+	for i := 0; i < groupTestIterations; i++ {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			t.Parallel()
 			t.Run(`ok`, func(t *testing.T) {
-				c1 := &testingComponent{}
-				c2 := &testingComponent{}
-				group := supervisor.NewGroup(context.Background(), c1, c2)
+				c1 := newDummyComponent("1", nil, nil, nil)
+				c2 := newDummyComponent("2", nil, nil, nil)
+				c3 := newDummyComponent("3", nil, nil, nil)
+
+				group := supervisor.NewGroup(context.Background(), c1, c2, c3)
 				assert.NoError(t, group.Open())
+				assert.NoError(t, group.Open()) // twice
+				go group.Close()
+				group.Wait()
 
-				assertStates(t,
+				assert.NoError(t, assertComponents(
+					[]*testingComponent{c1, c2, c3},
 					[]testingCounters{
-						{1, 0, -1},
-						{1, 0, -1},
-					},
-					[]*testingComponent{
-						c1, c2,
-					})
-			})
-			t.Run(`fail`, func(t *testing.T) {
-				c1 := &testingComponent{}
-				c2 := &testingComponent{
-					errOpen: errors.New("c2"),
-				}
-				group := supervisor.NewGroup(context.Background(), c1, c2)
-				assert.EqualError(t, group.Open(), "c2")
+						{1, 1, -1},
+						{1, 1, -1},
+						{1, 1, -1},
+					}))
 
-				time.Sleep(time.Millisecond * 50)
-				assertStates(t,
-					[]testingCounters{
-						{1, 1, -1}, // first close should be called
-						{1, 0, 0},  // second wait should not be called
-					},
-					[]*testingComponent{
-						c1, c2,
-					})
-			})
-		})
-	}
-
-}
-
-func TestGroup1_Close(t *testing.T) {
-	for i := 0; i < 10; i++ {
-		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			t.Parallel()
-			t.Run(`ok`, func(t *testing.T) {
-				c1 := &testingComponent{}
-				c2 := &testingComponent{}
-				group := supervisor.NewGroup(context.Background(), c1, c2)
-
+				// open after close
 				assert.NoError(t, group.Open())
-				assert.NoError(t, group.Close())
-				assertStates(t,
+				assert.NoError(t, assertComponents(
+					[]*testingComponent{c1, c2, c3},
 					[]testingCounters{
 						{1, 1, -1},
 						{1, 1, -1},
-					},
-					[]*testingComponent{
-						c1, c2,
-					})
+						{1, 1, -1},
+					}))
 			})
-			t.Run(`fail`, func(t *testing.T) {
-				c1 := &testingComponent{}
-				c2 := &testingComponent{
-					errClose: errors.New("c2"),
-				}
-				group := supervisor.NewGroup(context.Background(), c1, c2)
+			t.Run(`fail 2`, func(t *testing.T) {
+				c1 := newDummyComponent("1", nil, nil, nil)
+				c2 := newDummyComponent("2", errors.New("2"), nil, nil)
+				c3 := newDummyComponent("3", nil, nil, nil)
 
-				assert.NoError(t, group.Open())
-				assert.EqualError(t, group.Close(), "c2")
-				assertStates(t,
+				group := supervisor.NewGroup(context.Background(), c1, c2, c3)
+				assert.EqualError(t, group.Open(), "2")
+				assert.EqualError(t, group.Open(), "2") // twice
+
+				group.Wait()
+				assert.NoError(t, assertComponents(
+					[]*testingComponent{c1, c2, c3},
 					[]testingCounters{
 						{1, 1, -1},
+						{1, 0, -1}, // c2 should be not opened
 						{1, 1, -1},
-					},
-					[]*testingComponent{
-						c1, c2,
-					})
+					}))
+
+				// open after crash
+				assert.EqualError(t, group.Open(), "2")
+				assert.NoError(t, assertComponents(
+					[]*testingComponent{c1, c2, c3},
+					[]testingCounters{
+						{1, 1, -1},
+						{1, 0, -1}, // c2 should be not opened
+						{1, 1, -1},
+					}))
 			})
 		})
 	}
 }
 
-func TestGroup1_Wait(t *testing.T) {
-	for i := 0; i < 10; i++ {
+func TestGroup_Close(t *testing.T) {
+	for i := 0; i < groupTestIterations; i++ {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			t.Parallel()
-
 			t.Run(`ok`, func(t *testing.T) {
-				c1 := &testingComponent{}
-				c2 := &testingComponent{}
-				group := supervisor.NewGroup(context.Background(), c1, c2)
+				closedChan := make(chan struct{})
+				c1 := newDummyComponent("1", nil, nil, nil)
+				c2 := newDummyComponent("2", nil, nil, nil)
+				c3 := newDummyComponent("3", nil, nil, nil)
+
+				group := supervisor.NewGroup(context.Background(), c1, c2, c3)
+				assert.EqualError(t, group.Close(), "not open")
+				assert.EqualError(t, group.Wait(), "not open")
 
 				assert.NoError(t, group.Open())
+
+				go func() {
+					group.Wait()
+					close(closedChan)
+				}()
+
 				assert.NoError(t, group.Close())
+
+				<-closedChan
+				assert.NoError(t, assertComponents(
+					[]*testingComponent{c1, c2, c3},
+					[]testingCounters{
+						{1, 1, -1},
+						{1, 1, -1},
+						{1, 1, -1},
+					}))
+
+				// after
+				assert.NoError(t, group.Close())
+				assert.NoError(t, assertComponents(
+					[]*testingComponent{c1, c2, c3},
+					[]testingCounters{
+						{1, 1, -1},
+						{1, 1, -1},
+						{1, 1, -1},
+					}))
+			})
+			t.Run(strconv.Itoa(i), func(t *testing.T) {
+				t.Run(`fail`, func(t *testing.T) {
+					closedChan := make(chan struct{})
+					c1 := newDummyComponent("1", nil, nil, nil)
+					c2 := newDummyComponent("2", nil, errors.New("2"), nil)
+					c3 := newDummyComponent("3", nil, nil, nil)
+
+					group := supervisor.NewGroup(context.Background(), c1, c2, c3)
+					assert.EqualError(t, group.Close(), "not open")
+					assert.EqualError(t, group.Wait(), "not open")
+
+					assert.NoError(t, group.Open())
+
+					go func() {
+						group.Wait()
+						close(closedChan)
+					}()
+					assert.EqualError(t, group.Close(), "2")
+
+					<-closedChan
+					assert.NoError(t, assertComponents(
+						[]*testingComponent{c1, c2, c3},
+						[]testingCounters{
+							{1, 1, -1},
+							{1, 1, -1},
+							{1, 1, -1},
+						}))
+
+					assert.EqualError(t, group.Close(), "2")
+					assert.NoError(t, assertComponents(
+						[]*testingComponent{c1, c2, c3},
+						[]testingCounters{
+							{1, 1, -1},
+							{1, 1, -1},
+							{1, 1, -1},
+						}))
+				})
+			})
+		})
+	}
+}
+
+func TestGroup_Wait(t *testing.T) {
+	for i := 0; i < groupTestIterations; i++ {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			t.Parallel()
+			t.Run(`ok`, func(t *testing.T) {
+				closedChan := make(chan struct{})
+				c1 := newDummyComponent("1", nil, nil, nil)
+				c2 := newDummyComponent("2", nil, nil, nil)
+				c3 := newDummyComponent("3", nil, nil, nil)
+
+				group := supervisor.NewGroup(context.Background(), c1, c2, c3)
+				assert.EqualError(t, group.Close(), "not open")
+				assert.EqualError(t, group.Wait(), "not open")
+
+				assert.NoError(t, group.Open())
+
+				// pre
+				go func() {
+					assert.NoError(t, group.Wait())
+					assert.NoError(t, assertComponents(
+						[]*testingComponent{c1, c2, c3},
+						[]testingCounters{
+							{1, 1, 1},
+							{1, 1, 1},
+							{1, 1, 1},
+						}))
+					close(closedChan)
+				}()
+
+				group.Close()
+
 				assert.NoError(t, group.Wait())
-				assertStates(t,
+				assert.NoError(t, assertComponents(
+					[]*testingComponent{c1, c2, c3},
 					[]testingCounters{
 						{1, 1, 1},
 						{1, 1, 1},
-					},
-					[]*testingComponent{
-						c1, c2,
-					})
+						{1, 1, 1},
+					}))
+
+				// second
+				assert.NoError(t, group.Wait())
+				assert.NoError(t, assertComponents(
+					[]*testingComponent{c1, c2, c3},
+					[]testingCounters{
+						{1, 1, 1},
+						{1, 1, 1},
+						{1, 1, 1},
+					}))
 			})
-			t.Run(`fail after close`, func(t *testing.T) {
-				c1 := &testingComponent{}
-				c2 := &testingComponent{
-					errWait: errors.New("c2"),
-				}
-				group := supervisor.NewGroup(context.Background(), c1, c2)
+			t.Run(`fail`, func(t *testing.T) {
+				closedChan := make(chan struct{})
+				c1 := newDummyComponent("1", nil, nil, nil)
+				c2 := newDummyComponent("2", nil, nil, errors.New("2"))
+				c3 := newDummyComponent("3", nil, nil, nil)
+
+				group := supervisor.NewGroup(context.Background(), c1, c2, c3)
+				assert.EqualError(t, group.Close(), "not open")
+				assert.EqualError(t, group.Wait(), "not open")
 
 				assert.NoError(t, group.Open())
-				assert.NoError(t, group.Close())
-				assert.EqualError(t, group.Wait(), "c2")
-				assertStates(t,
+
+				// pre
+				go func() {
+					assert.EqualError(t, group.Wait(), "2")
+					assert.NoError(t, assertComponents(
+						[]*testingComponent{c1, c2, c3},
+						[]testingCounters{
+							{1, 1, 1},
+							{1, 1, 1},
+							{1, 1, 1},
+						}))
+					close(closedChan)
+				}()
+
+				group.Close()
+
+				assert.EqualError(t, group.Wait(), "2")
+				assert.NoError(t, assertComponents(
+					[]*testingComponent{c1, c2, c3},
 					[]testingCounters{
 						{1, 1, 1},
 						{1, 1, 1},
-					},
-					[]*testingComponent{
-						c1, c2,
-					})
-			})
-			t.Run(`fail without close`, func(t *testing.T) {
-				c1 := &testingComponent{}
-				c2 := &testingComponent{
-					errWait: errors.New("c2"),
-				}
-				group := supervisor.NewGroup(context.Background(), c1, c2)
+						{1, 1, 1},
+					}))
 
-				assert.NoError(t, group.Open())
-				assert.EqualError(t, group.Wait(), "c2")
-
-				time.Sleep(time.Millisecond * 100)
-				assertStates(t,
+				// second
+				assert.EqualError(t, group.Wait(), "2")
+				assert.NoError(t, assertComponents(
+					[]*testingComponent{c1, c2, c3},
 					[]testingCounters{
 						{1, 1, 1},
 						{1, 1, 1},
-					},
-					[]*testingComponent{
-						c1, c2,
-					})
+						{1, 1, 1},
+					}))
 			})
 		})
 	}

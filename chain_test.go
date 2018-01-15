@@ -69,12 +69,14 @@ func (c *chainable) Crash(err error) {
 }
 
 func TestChain_Empty(t *testing.T) {
+	t.Skip()
 	c := supervisor.NewChain(context.TODO())
 	c.Open()
 	c.Wait()
 }
 
 func TestChain_OK(t *testing.T) {
+	t.Skip()
 	var closeCount int64
 	resCh := make(chan chainableSig)
 	var res []chainableSig
@@ -113,6 +115,7 @@ func TestChain_OK(t *testing.T) {
 }
 
 func TestChain_Crash(t *testing.T) {
+	t.Skip()
 	var closeCount int64
 	resCh := make(chan chainableSig)
 	var res []chainableSig

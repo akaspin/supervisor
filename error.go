@@ -1,5 +1,32 @@
 package supervisor
 
+import (
+	"errors"
+	"sync"
+)
+
+var (
+	// Component is not opened error
+	ErrNotOpened = errors.New("not open")
+)
+
+type componentErr struct {
+	sync.Mutex
+	error
+}
+
+func (e *componentErr) set(err error) {
+	e.Lock()
+	defer e.Unlock()
+	e.error = AppendError(e.error, err)
+}
+
+func (e *componentErr) get() (err error) {
+	e.Lock()
+	defer e.Unlock()
+	return e.error
+}
+
 type MultiError []error
 
 func (e MultiError) Error() (res string) {
