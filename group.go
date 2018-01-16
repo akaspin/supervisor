@@ -104,5 +104,5 @@ func (g *Group) Wait() (err error) {
 	}
 	g.waitWg.Wait()
 	err = g.waitE.get()
-	return
+	return err
 }

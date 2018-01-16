@@ -8,6 +8,9 @@ import (
 var (
 	// Component is not opened error
 	ErrNotOpened = errors.New("not open")
+
+	// Empty composite component
+	ErrEmptyComposite = errors.New("composite component is empty")
 )
 
 type componentErr struct {
