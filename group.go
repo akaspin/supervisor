@@ -9,28 +9,16 @@ import (
 // Group manages components in parallel manner. Empty Group closes
 // immediately with error.
 type Group struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-
+	*compositeBase
 	components []Component
-
-	opened uint32
-
-	openE componentErr
-
-	closeWg sync.WaitGroup
-	closeE  componentErr
-
-	waitWg sync.WaitGroup
-	waitE  componentErr
 }
 
 // NewGroup creates Group. Provided context manages whole group.
 func NewGroup(ctx context.Context, components ...Component) (g *Group) {
 	g = &Group{
-		components: components,
+		compositeBase: newCompositeBase(ctx),
+		components:    components,
 	}
-	g.ctx, g.cancel = context.WithCancel(ctx)
 	return
 }
 
@@ -55,11 +43,14 @@ func (g *Group) Open() (err error) {
 			}
 			// close watchdog
 			g.closeWg.Add(1)
+			var waitExited uint32
 			go func() {
 				defer g.closeWg.Done()
 				<-g.ctx.Done()
-				if closeErr := component.Close(); closeErr != nil {
-					g.closeE.set(closeErr)
+				if atomic.CompareAndSwapUint32(&waitExited, 0, 1) {
+					if closeErr := component.Close(); closeErr != nil {
+						g.closeE.set(closeErr)
+					}
 				}
 			}()
 			// wait watchdog
@@ -69,40 +60,12 @@ func (g *Group) Open() (err error) {
 				if waitErr := component.Wait(); waitErr != nil {
 					g.waitE.set(waitErr)
 				}
+				atomic.CompareAndSwapUint32(&waitExited, 0, 1)
 				g.cancel()
 			}()
 		}(component)
 	}
-	// wait
 	wg.Wait()
 	err = g.openE.error
 	return
-}
-
-// Close closes all components and returns Close errors if any.
-// Close may be called multiple times and guarantees that each component will
-// be closed only once. Regardless of number of calls Close will return same
-// result. If Group is not opened yet Close will return `ErrNotOpened`.
-func (g *Group) Close() (err error) {
-	if atomic.LoadUint32(&g.opened) == 0 {
-		return ErrNotOpened
-	}
-	g.cancel()
-	g.closeWg.Wait()
-	err = g.closeE.get()
-	return err
-}
-
-// Wait waits for all components. If one of Component.Wait returns Wait
-// closes all components. Wait may be called multiple times and guarantees
-// that Wait for each component will be called only once. Regardless of number
-// of calls Wait will return same result. If Group is not opened yet Wait
-// will return `ErrNotOpened`.
-func (g *Group) Wait() (err error) {
-	if atomic.LoadUint32(&g.opened) == 0 {
-		return ErrNotOpened
-	}
-	g.waitWg.Wait()
-	err = g.waitE.get()
-	return err
 }

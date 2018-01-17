@@ -15,15 +15,15 @@ import (
 //	}
 //
 type Control struct {
-	ctx     context.Context
-	cancel  context.CancelFunc
-	block   *CompositeBlock
+	ctx    context.Context
+	cancel context.CancelFunc
+	block  *CompositeBlock
 }
 
 // NewControl returns new Control.
 func NewControl(ctx context.Context, blocks ...Blocker) (c *Control) {
 	c = &Control{
-		block:   NewCompositeBlock(blocks...),
+		block: NewCompositeBlock(blocks...),
 	}
 	c.ctx, c.cancel = context.WithCancel(ctx)
 	return
