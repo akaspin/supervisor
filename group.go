@@ -10,16 +10,12 @@ import (
 Group supervises Components in parallel. All supervised components are open
 and closed concurrently.
 
-Group.Open blocks until all components are opened. If Component Open
-returns error Group will close all ascendants.
-
-Group.Wait blocks until all components in Group are exited. If one of
-component Wait is exited while Group is open all Components will be closed
-in parallel.
-
 Open, Close and Wait methods may be called many times and will return equal
 results. Group guarantees that Open, Close and Wait methods for all Components
 will be called once.
+
+Group collects and returns error from corresponding Component methods. If more
+than one Components returns errors they will be wrapped in MultiError.
 */
 type Group struct {
 	*compositeBase
@@ -36,6 +32,8 @@ func NewGroup(ctx context.Context, components ...Component) (g *Group) {
 	return
 }
 
+// Open blocks until all components are opened. If Component Open() method
+// returns error Group will close all ascendants.
 func (g *Group) Open() (err error) {
 	if !atomic.CompareAndSwapUint32(&g.opened, 0, 1) {
 		return g.openE.get()
@@ -77,4 +75,16 @@ func (g *Group) Open() (err error) {
 	wg.Wait()
 	err = g.openE.error
 	return
+}
+
+// Close initialises shutdown for all Components.
+func (c *Group) Close() (err error) {
+	return c.compositeBase.Close()
+}
+
+// Wait blocks until all components in Group are exited. If one of Wait()
+// method of one of Components is exited while Group is open Group closes all
+// other Components in parallel.
+func (c *Group) Wait() (err error) {
+	return c.compositeBase.Wait()
 }

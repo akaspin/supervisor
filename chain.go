@@ -9,18 +9,12 @@ import (
 Chain supervises Components in order. All supervised components are open
 in FIFO order and closed in LIFO order.
 
-Chain.Open blocks until all components are opened. Chain calls Open for each
-descendant only after ascendant Open returns no error. If Component Open
-returns error Chain will close all ascendants in LIFO order.
-
-Chain.Wait blocks until all components in Chain are exited. Chain closes each
-ascendant Component only after then its descendant Wait is exited. If one of
-component Wait is exited while Chain is open all Components will be closed
-one-by-one in LIFO order.
-
 Open, Close and Wait methods may be called many times and will return equal
 results. Chain guarantees that Open, Close and Wait methods for all Components
 will be called once.
+
+Chain collects and returns error from corresponding Component methods. If more
+than one Components returns errors they will be wrapped in MultiError.
 */
 type Chain struct {
 	*compositeBase
@@ -37,6 +31,10 @@ func NewChain(ctx context.Context, components ...Component) (c *Chain) {
 	return
 }
 
+// Open blocks until all components are opened in FIFO order. Chain calls
+// Open() method for each descendant only after ascendant Open() returns no
+// error. If Component Open() returns error Chain will close all ascendants
+// in LIFO order.
 func (c *Chain) Open() (err error) {
 	if !atomic.CompareAndSwapUint32(&c.opened, 0, 1) {
 		return c.openE.get()
@@ -52,6 +50,19 @@ func (c *Chain) Open() (err error) {
 		c.openE.set(err)
 	}
 	return
+}
+
+// Close initialises shutdown for all Components in LIFO order.
+func (c *Chain) Close() (err error) {
+	return c.compositeBase.Close()
+}
+
+// Wait blocks until all components in Chain are exited. Chain closes each
+// ascendant Component only after then its descendant Wait() method is exited.
+// If one of component Wait() is exited while Chain is open all Components will
+// be closed one-by-one in LIFO order.
+func (c *Chain) Wait() (err error) {
+	return c.compositeBase.Wait()
 }
 
 func (c *Chain) build(ascendantCancel context.CancelFunc, tail []Component) (err error) {
