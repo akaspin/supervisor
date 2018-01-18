@@ -1,13 +1,41 @@
 package supervisor
 
-type MultiError struct {
-	Errs []error
+import (
+	"errors"
+	"sync"
+)
+
+var (
+	// Component is not opened error
+	ErrNotOpened = errors.New("not open")
+
+	// Empty composite component
+	ErrEmptyComposite = errors.New("composite component is empty")
+)
+
+type componentErr struct {
+	sync.Mutex
+	error
 }
 
-func (e *MultiError) Error() (res string) {
-	for i, e1 := range e.Errs {
+func (e *componentErr) set(err error) {
+	e.Lock()
+	defer e.Unlock()
+	e.error = AppendError(e.error, err)
+}
+
+func (e *componentErr) get() (err error) {
+	e.Lock()
+	defer e.Unlock()
+	return e.error
+}
+
+type MultiError []error
+
+func (e MultiError) Error() (res string) {
+	for i, e1 := range e {
 		if i > 0 {
-			res += " : "
+			res += ","
 		}
 		res += e1.Error()
 	}
@@ -27,17 +55,17 @@ func AppendError(left, right error) (err error) {
 		err = left
 		return
 	}
-	err1 := &MultiError{}
-	if l1, ok := left.(*MultiError); ok {
-		err1.Errs = append(err1.Errs, l1.Errs...)
+	var err1 MultiError
+	if l1, ok := left.(MultiError); ok {
+		err1 = append(err1, l1...)
 	} else {
-		err1.Errs = append(err1.Errs, left)
+		err1 = append(err1, left)
 	}
-	if l1, ok := right.(*MultiError); ok {
-		err1.Errs = append(err1.Errs, l1.Errs...)
+	if l1, ok := right.(MultiError); ok {
+		err1 = append(err1, l1...)
 	} else {
-		err1.Errs = append(err1.Errs, right)
+		err1 = append(err1, right)
 	}
-
+	err = err1
 	return
 }
