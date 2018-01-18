@@ -6,14 +6,28 @@ import (
 	"sync/atomic"
 )
 
-// Group manages components in parallel manner. Empty Group closes
-// immediately with error.
+/*
+Group supervises Components in parallel. All supervised components are open
+and closed concurrently.
+
+Group.Open blocks until all components are opened. If Component Open
+returns error Group will close all ascendants.
+
+Group.Wait blocks until all components in Group are exited. If one of
+component Wait is exited while Group is open all Components will be closed
+in parallel.
+
+Open, Close and Wait methods may be called many times and will return equal
+results. Group guarantees that Open, Close and Wait methods for all Components
+will be called once.
+*/
 type Group struct {
 	*compositeBase
 	components []Component
 }
 
-// NewGroup creates Group. Provided context manages whole group.
+// NewGroup creates new Group. Provided context manages whole Group. Close
+// Context is equivalent to call Group.Close().
 func NewGroup(ctx context.Context, components ...Component) (g *Group) {
 	g = &Group{
 		compositeBase: newCompositeBase(ctx),
@@ -22,11 +36,6 @@ func NewGroup(ctx context.Context, components ...Component) (g *Group) {
 	return
 }
 
-// Open opens all components together and blocks until they are opened.
-// If at least one of components returns error Group closes all components
-// and returns all Open errors. Open may be called many times and guarantees
-// that Open of each component will be called only once. Regardless of number
-// of calls Open always returns same result.
 func (g *Group) Open() (err error) {
 	if !atomic.CompareAndSwapUint32(&g.opened, 0, 1) {
 		return g.openE.get()

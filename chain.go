@@ -5,11 +5,30 @@ import (
 	"sync/atomic"
 )
 
+/*
+Chain supervises Components in order. All supervised components are open
+in FIFO order and closed in LIFO order.
+
+Chain.Open blocks until all components are opened. Chain calls Open for each
+descendant only after ascendant Open returns no error. If Component Open
+returns error Chain will close all ascendants in LIFO order.
+
+Chain.Wait blocks until all components in Chain are exited. Chain closes each
+ascendant Component only after then its descendant Wait is exited. If one of
+component Wait is exited while Chain is open all Components will be closed
+one-by-one in LIFO order.
+
+Open, Close and Wait methods may be called many times and will return equal
+results. Chain guarantees that Open, Close and Wait methods for all Components
+will be called once.
+*/
 type Chain struct {
 	*compositeBase
 	components []Component
 }
 
+// NewChain creates new Chain. Provided context manages whole Chain. Close
+// Context is equivalent to call Chain.Close().
 func NewChain(ctx context.Context, components ...Component) (c *Chain) {
 	c = &Chain{
 		compositeBase: newCompositeBase(ctx),
@@ -89,10 +108,4 @@ func (c *Chain) build(ascendantCancel context.CancelFunc, tail []Component) (err
 	}()
 
 	return c.build(cancel, tail[1:])
-}
-
-type chainComponent struct {
-	ascendant    *chainComponent
-	component    Component
-	shutdownChan chan struct{} // upstream close
 }
