@@ -6,41 +6,86 @@ import (
 	"sync/atomic"
 )
 
-type compositeBase struct {
-	ctx    context.Context
-	cancel context.CancelFunc
+type compositeControl struct {
+	ctx        context.Context
+	cancelFunc context.CancelFunc
 
-	opened uint32
-	openE  componentErr
+	open uint32
 
 	closeWg sync.WaitGroup
-	closeE  componentErr
+	waitWg  sync.WaitGroup // WG to wait for exit of all components
 
-	waitWg sync.WaitGroup
-	waitE  componentErr
+	openError  wrapErr
+	closeError wrapErr
+	waitError  wrapErr // composite Wait() error
 }
 
-func newCompositeBase(ctx context.Context) (b *compositeBase) {
-	b = &compositeBase{}
-	b.ctx, b.cancel = context.WithCancel(ctx)
-	return b
+func (c *compositeControl) isOpen() (ok bool) {
+	return atomic.LoadUint32(&c.open) == 1
 }
 
-func (b *compositeBase) Close() (err error) {
-	if atomic.LoadUint32(&b.opened) == 0 {
-		return ErrNotOpened
+func (c *compositeControl) tryOpen() (op bool) {
+	return atomic.CompareAndSwapUint32(&c.open, 0, 1)
+}
+
+type composite struct {
+	handler func(control *compositeControl)
+	control *compositeControl
+}
+
+func newComposite(ctx context.Context, handler func(control *compositeControl)) (c *composite) {
+	c = &composite{
+		handler: handler,
+		control: &compositeControl{},
 	}
-	b.cancel()
-	b.closeWg.Wait()
-	err = b.closeE.get()
-	return err
+	c.control.ctx, c.control.cancelFunc = context.WithCancel(ctx)
+	return c
 }
 
-func (c *compositeBase) Wait() (err error) {
-	if atomic.LoadUint32(&c.opened) == 0 {
-		return ErrNotOpened
+// Open blocks until all components are opened. This method should be called
+// before Close(). Otherwise Open() will return error. If Open() method of one
+// of components returns error all opened components will be closed. This
+// method may be called many times and will return equal results. It's
+// guaranteed that Open() method of all components will be called only once.
+func (c *composite) Open() (err error) {
+	select {
+	case <-c.control.ctx.Done(): // closed
+		if !c.control.isOpen() {
+			// closed before open
+			return ErrPrematurelyClosed
+		}
+		return c.control.openError.get()
+	default:
 	}
-	c.waitWg.Wait()
-	err = c.waitE.get()
-	return err
+	if !c.control.tryOpen() {
+		return c.control.openError.get()
+	}
+
+	c.handler(c.control)
+	return c.control.openError.get()
+}
+
+// Close initialises shutdown for all Components. This method may be called
+// many times and will return equal results. It's guaranteed that Close()
+// method of all components will be called only once.
+func (c *composite) Close() (err error) {
+	select {
+	case <-c.control.ctx.Done():
+		// already closed
+		return c.control.closeError.get()
+	default:
+		c.control.cancelFunc()
+		c.control.closeWg.Wait()
+	}
+	return c.control.closeError.get()
+}
+
+// Wait blocks until all components are exited. If one of Wait() method of one
+// of Components is exited before Close() all opened components will be closed.
+// This method may be called many times and will return equal results. It's
+// guaranteed that Close() method of all components will be called only once.
+func (c *composite) Wait() (err error) {
+	<-c.control.ctx.Done()
+	c.control.waitWg.Wait()
+	return c.control.waitError.get()
 }

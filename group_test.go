@@ -9,186 +9,155 @@ import (
 	"testing"
 )
 
-func TestGroup_Open(t *testing.T) {
+func TestGroup_Cycle(t *testing.T) {
+	t.Parallel()
 	for i := 0; i < compositeTestIterations; i++ {
-		t.Run(`ok-`+strconv.Itoa(i), func(t *testing.T) {
-			t.Parallel()
+
+		t.Run(`empty owc `+strconv.Itoa(i), func(t *testing.T) {
+			waitCh := make(chan struct{})
+			sv := supervisor.NewGroup(context.Background())
+
+			assert.NoError(t, sv.Open())
+
+			go func() {
+				assert.NoError(t, sv.Wait())
+				close(waitCh)
+			}()
+
+			assert.NoError(t, sv.Open())
+			assert.NoError(t, sv.Close())
+
+			<-waitCh
+			assert.NoError(t, sv.Wait())
+		})
+		t.Run(`close first `+strconv.Itoa(i), func(t *testing.T) {
+			waitCh := make(chan struct{})
+			c1 := newTestingComponent("1", nil, nil, nil)
+			c2 := newTestingComponent("2", nil, nil, nil)
+			sv := supervisor.NewGroup(context.Background(), c1, c2)
+
+			assert.NoError(t, sv.Close())
+			assert.EqualError(t, sv.Open(), "prematurely closed")
+			go func() {
+				assert.NoError(t, sv.Wait())
+				close(waitCh)
+			}()
+			<-waitCh
+			c1.assertEvents(t)
+			c1.assertEvents(t)
+		})
+		t.Run(`owc `+strconv.Itoa(i), func(t *testing.T) {
+			waitCh := make(chan struct{})
 			c1 := newTestingComponent("1", nil, nil, nil)
 			c2 := newTestingComponent("2", nil, nil, nil)
 			c3 := newTestingComponent("3", nil, nil, nil)
+			sv := supervisor.NewGroup(context.Background(), c1, c2, c3)
 
-			group := supervisor.NewGroup(context.Background(), c1, c2, c3)
-			assert.NoError(t, group.Open())
-			assert.NoError(t, group.Open()) // twice
-			go group.Close()
-			group.Wait()
+			assert.NoError(t, sv.Open())
 
+			go func() {
+				assert.NoError(t, sv.Wait())
+				close(waitCh)
+			}()
+
+			assert.NoError(t, sv.Open())
+			assert.NoError(t, sv.Close())
+
+			<-waitCh
 			c1.assertCycle(t)
 			c2.assertCycle(t)
 			c3.assertCycle(t)
-
-			// open after close
-			assert.NoError(t, group.Open())
-			c1.assertCycle(t)
 		})
-		t.Run(`fail 2-`+strconv.Itoa(i), func(t *testing.T) {
-			t.Parallel()
+		t.Run(`o-error wc `+strconv.Itoa(i), func(t *testing.T) {
+			waitCh := make(chan struct{})
 			c1 := newTestingComponent("1", nil, nil, nil)
 			c2 := newTestingComponent("2", errors.New("2"), nil, nil)
 			c3 := newTestingComponent("3", nil, nil, nil)
+			sv := supervisor.NewGroup(context.Background(), c1, c2, c3)
 
-			group := supervisor.NewGroup(context.Background(), c1, c2, c3)
-			assert.EqualError(t, group.Open(), "2")
-			assert.EqualError(t, group.Open(), "2") // twice
-
-			group.Wait()
-			c1.assertCycle(t)
-			c2.assertEvents(t, "open")
-			c3.assertCycle(t)
-
-			// open after crash
-			assert.EqualError(t, group.Open(), "2")
-			c1.assertCycle(t)
-			c2.assertEvents(t, "open")
-		})
-	}
-}
-
-func TestGroup_Close(t *testing.T) {
-	for i := 0; i < compositeTestIterations; i++ {
-		t.Run(`ok`+strconv.Itoa(i), func(t *testing.T) {
-			t.Parallel()
-			closedChan := make(chan struct{})
-			c1 := newTestingComponent("1", nil, nil, nil)
-			c2 := newTestingComponent("2", nil, nil, nil)
-			c3 := newTestingComponent("3", nil, nil, nil)
-
-			group := supervisor.NewGroup(context.Background(), c1, c2, c3)
-			assert.EqualError(t, group.Close(), "not open")
-			assert.EqualError(t, group.Wait(), "not open")
-
-			assert.NoError(t, group.Open())
+			assert.EqualError(t, sv.Open(), "2")
 
 			go func() {
-				group.Wait()
-				close(closedChan)
+				assert.NoError(t, sv.Wait())
+				close(waitCh)
 			}()
 
-			assert.NoError(t, group.Close())
+			assert.EqualError(t, sv.Open(), "2")
+			assert.NoError(t, sv.Close())
 
-			<-closedChan
+			<-waitCh
 			c1.assertCycle(t)
-			c2.assertCycle(t)
+			c2.assertEvents(t, "open")
 			c3.assertCycle(t)
-
-			// after
-			assert.NoError(t, group.Close())
-			c1.assertCycle(t)
 		})
-		t.Run(`fail`+strconv.Itoa(i), func(t *testing.T) {
-			t.Parallel()
-			closedChan := make(chan struct{})
+		t.Run(`ow c-error `+strconv.Itoa(i), func(t *testing.T) {
+			waitCh := make(chan struct{})
 			c1 := newTestingComponent("1", nil, nil, nil)
 			c2 := newTestingComponent("2", nil, errors.New("2"), nil)
 			c3 := newTestingComponent("3", nil, nil, nil)
+			sv := supervisor.NewGroup(context.Background(), c1, c2, c3)
 
-			group := supervisor.NewGroup(context.Background(), c1, c2, c3)
-			assert.EqualError(t, group.Close(), "not open")
-			assert.EqualError(t, group.Wait(), "not open")
-
-			assert.NoError(t, group.Open())
+			assert.NoError(t, sv.Open())
 
 			go func() {
-				group.Wait()
-				close(closedChan)
+				assert.NoError(t, sv.Wait())
+				close(waitCh)
 			}()
-			assert.EqualError(t, group.Close(), "2")
 
-			<-closedChan
+			assert.NoError(t, sv.Open())
+			assert.EqualError(t, sv.Close(), "2")
+
+			<-waitCh
 			c1.assertCycle(t)
 			c2.assertCycle(t)
 			c3.assertCycle(t)
-
-			assert.EqualError(t, group.Close(), "2")
 		})
-	}
-}
-
-func TestGroup_Wait(t *testing.T) {
-	for i := 0; i < compositeTestIterations; i++ {
-		t.Run(`ok`+strconv.Itoa(i), func(t *testing.T) {
-			t.Parallel()
-			closedChan := make(chan struct{})
-			c1 := newTestingComponent("1", nil, nil, nil)
-			c2 := newTestingComponent("2", nil, nil, nil)
-			c3 := newTestingComponent("3", nil, nil, nil)
-
-			group := supervisor.NewGroup(context.Background(), c1, c2, c3)
-			assert.EqualError(t, group.Close(), "not open")
-			assert.EqualError(t, group.Wait(), "not open")
-
-			assert.NoError(t, group.Open())
-
-			// pre
-			go func() {
-				assert.NoError(t, group.Wait())
-				c1.assertCycle(t)
-				c2.assertCycle(t)
-				c3.assertCycle(t)
-				close(closedChan)
-			}()
-
-			group.Close()
-
-			assert.NoError(t, group.Wait())
-			assert.NoError(t, group.Wait())
-		})
-		t.Run(`fail`+strconv.Itoa(i), func(t *testing.T) {
-			t.Parallel()
-			closedChan := make(chan struct{})
+		t.Run(`o w-error c `+strconv.Itoa(i), func(t *testing.T) {
+			waitCh := make(chan struct{})
 			c1 := newTestingComponent("1", nil, nil, nil)
 			c2 := newTestingComponent("2", nil, nil, errors.New("2"))
 			c3 := newTestingComponent("3", nil, nil, nil)
+			sv := supervisor.NewGroup(context.Background(), c1, c2, c3)
 
-			group := supervisor.NewGroup(context.Background(), c1, c2, c3)
-			assert.EqualError(t, group.Close(), "not open")
-			assert.EqualError(t, group.Wait(), "not open")
+			assert.NoError(t, sv.Open())
 
-			assert.NoError(t, group.Open())
-
-			// pre
 			go func() {
-				assert.EqualError(t, group.Wait(), "2")
-				c1.assertCycle(t)
-				c2.assertCycle(t)
-				c3.assertCycle(t)
-				close(closedChan)
+				assert.EqualError(t, sv.Wait(), "2")
+				close(waitCh)
 			}()
 
-			group.Close()
+			assert.NoError(t, sv.Open())
+			assert.NoError(t, sv.Close())
+			assert.EqualError(t, sv.Wait(), "2")
 
-			assert.EqualError(t, group.Wait(), "2")
-
-			// second
-			assert.EqualError(t, group.Wait(), "2")
+			<-waitCh
+			c1.assertCycle(t)
+			c2.assertCycle(t)
+			c3.assertCycle(t)
 		})
-		t.Run(`self close`+strconv.Itoa(i), func(t *testing.T) {
-			t.Parallel()
+		t.Run(`exit one `+strconv.Itoa(i), func(t *testing.T) {
+			waitCh := make(chan struct{})
 			c1 := newTestingComponent("1", nil, nil, nil)
 			c2 := newTestingComponent("2", nil, nil, nil)
 			c3 := newTestingComponent("3", nil, nil, nil)
+			sv := supervisor.NewGroup(context.Background(), c1, c2, c3)
 
-			group := supervisor.NewGroup(context.Background(), c1, c2, c3)
-			assert.EqualError(t, group.Close(), "not open")
-			assert.EqualError(t, group.Wait(), "not open")
+			assert.NoError(t, sv.Open())
 
-			assert.NoError(t, group.Open())
+			go func() {
+				assert.NoError(t, sv.Wait())
+				close(waitCh)
+			}()
+
+			assert.NoError(t, sv.Open())
 			close(c2.closedChan)
+			assert.NoError(t, sv.Wait())
 
-			assert.NoError(t, group.Wait())
+			<-waitCh
 			c1.assertCycle(t)
 			c2.assertEvents(t, "open", "done")
 			c3.assertCycle(t)
 		})
 	}
+
 }
