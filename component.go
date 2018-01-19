@@ -8,7 +8,6 @@ type Component interface {
 	Open() (err error)
 
 	// Close initialises Component shutdown.
-	// Non blocking behaviour is recommended.
 	Close() (err error)
 
 	// Wait should blocks until Component shutdown.

@@ -83,7 +83,7 @@ func (c *composite) Close() (err error) {
 // Wait blocks until all components are exited. If one of Wait() method of one
 // of Components is exited before Close() all opened components will be closed.
 // This method may be called many times and will return equal results. It's
-// guaranteed that Close() method of all components will be called only once.
+// guaranteed that Wait() method of all components will be called only once.
 func (c *composite) Wait() (err error) {
 	<-c.control.ctx.Done()
 	c.control.waitWg.Wait()
