@@ -1,13 +1,16 @@
 package supervisor
 
+// Component is basic building block to build supervisor trees
 type Component interface {
 
-	// Open blocks until component is opened
+	// Open runs Component initialisation and should blocks until
+	// Component is initialised.
 	Open() (err error)
 
-	// Close blocks until component is closed
+	// Close initialises Component shutdown.
+	// Non blocking behaviour is recommended.
 	Close() (err error)
 
-	// Wait blocks until component is closed or error occurs
+	// Wait should blocks until Component shutdown.
 	Wait() (err error)
 }

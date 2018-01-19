@@ -6,25 +6,23 @@ import (
 )
 
 var (
-	// Component is not opened error
-	ErrNotOpened = errors.New("not open")
-
-	// Empty composite component
-	ErrEmptyComposite = errors.New("composite component is empty")
+	// ErrPrematurelyClosed notifies that Close() method
+	// was called before Open()
+	ErrPrematurelyClosed = errors.New("prematurely closed")
 )
 
-type componentErr struct {
+type wrapErr struct {
 	sync.Mutex
 	error
 }
 
-func (e *componentErr) set(err error) {
+func (e *wrapErr) set(err error) {
 	e.Lock()
 	defer e.Unlock()
 	e.error = AppendError(e.error, err)
 }
 
-func (e *componentErr) get() (err error) {
+func (e *wrapErr) get() (err error) {
 	e.Lock()
 	defer e.Unlock()
 	return e.error

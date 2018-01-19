@@ -17,38 +17,33 @@ import (
 type Control struct {
 	ctx    context.Context
 	cancel context.CancelFunc
-	block  *CompositeBlock
 }
 
-// NewControl returns new Control.
-func NewControl(ctx context.Context, blocks ...Blocker) (c *Control) {
-	c = &Control{
-		block: NewCompositeBlock(blocks...),
-	}
+// NewControl returns new Control
+func NewControl(ctx context.Context, blockers ...Component) (c *Control) {
+	c = &Control{}
 	c.ctx, c.cancel = context.WithCancel(ctx)
 	return
 }
 
 func (c *Control) Open() (err error) {
-	return
+	return nil
 }
 
-// Close closes Control context and begins evaluation of all blockers
+// Close closes Control context
 func (c *Control) Close() (err error) {
 	c.cancel()
-	err = c.block.Close()
-	return
+	return nil
 }
 
-// Wait waits for attached blockers
+// Wait blocks until component shutdown
 func (c *Control) Wait() (err error) {
 	<-c.ctx.Done()
-	err = c.block.Wait()
-	return
+	return nil
 }
 
-// Ctx returns Control context. Control context is always closed before
-// evaluate blockers.
+// Ctx returns Control context. Control context is always
+// closed before blockers evaluation.
 func (c *Control) Ctx() context.Context {
 	return c.ctx
 }

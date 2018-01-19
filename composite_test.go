@@ -68,7 +68,7 @@ func (c *testingComponent) assertEvents(t *testing.T, events ...string) {
 	t.Helper()
 	c.eventsMu.Lock()
 	defer c.eventsMu.Unlock()
-	assert.Equal(t, c.events, events)
+	assert.Equal(t, events, c.events, c.name)
 }
 
 func (c *testingComponent) assertCycle(t *testing.T) {
@@ -79,6 +79,7 @@ func (c *testingComponent) assertCycle(t *testing.T) {
 func (c *testingComponent) Open() (err error) {
 	err = c.errOpen
 	c.appendEvent("open")
+	//println("o", c.name)
 	return
 }
 
