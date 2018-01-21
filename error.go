@@ -11,18 +11,18 @@ var (
 	ErrPrematurelyClosed = errors.New("prematurely closed")
 )
 
-type wrapErr struct {
+type compositeError struct {
 	sync.Mutex
 	error
 }
 
-func (e *wrapErr) set(err error) {
+func (e *compositeError) set(err error) {
 	e.Lock()
 	defer e.Unlock()
 	e.error = AppendError(e.error, err)
 }
 
-func (e *wrapErr) get() (err error) {
+func (e *compositeError) get() (err error) {
 	e.Lock()
 	defer e.Unlock()
 	return e.error
