@@ -20,20 +20,20 @@ type Timeout struct {
 	openChan chan struct{} // open chan closed once
 	openErr  compositeError
 
-	closedChan    chan struct{} // Close() method of descendant
-	closeErr     compositeError
+	closedChan chan struct{} // Close() method of descendant
+	closeErr   compositeError
 
-	doneCtx context.Context
+	doneCtx    context.Context
 	doneCancel context.CancelFunc
-	doneErr  compositeError
+	doneErr    compositeError
 }
 
 // NewTimeout creates new Timeout
 func NewTimeout(ctx context.Context, timeout time.Duration, component Component) (t *Timeout) {
 	t = &Timeout{
-		timeout: timeout,
-		component: component,
-		openChan: make(chan struct{}),
+		timeout:    timeout,
+		component:  component,
+		openChan:   make(chan struct{}),
 		closedChan: make(chan struct{}),
 	}
 	t.ctx, t.cancel = context.WithCancel(ctx)
@@ -77,7 +77,7 @@ func (t *Timeout) Open() (err error) {
 
 		// supervise wait
 		go func() {
-			if doneErr := t.component.Wait(); doneErr!= nil {
+			if doneErr := t.component.Wait(); doneErr != nil {
 				select {
 				case <-t.doneCtx.Done():
 				default:

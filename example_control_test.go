@@ -12,7 +12,7 @@ import (
 // components will be called only once.
 type LayeredControl struct {
 	*supervisor.Control // managed externally
-	doneControl *supervisor.Control
+	doneControl         *supervisor.Control
 }
 
 func NewLayeredControl(ctx context.Context) (c *LayeredControl) {

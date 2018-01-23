@@ -54,4 +54,3 @@ func (c *Control) IsClosed() (ok bool) {
 		return false
 	}
 }
-
