@@ -11,7 +11,7 @@ import (
 )
 
 func TestTrap_Wait(t *testing.T) {
-	for i:=0; i<compositeTestIterations; i++ {
+	for i := 0; i < compositeTestIterations; i++ {
 		t.Run("with error "+strconv.Itoa(i), func(t *testing.T) {
 			t.Parallel()
 			trap := supervisor.NewTrap(context.Background())

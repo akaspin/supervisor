@@ -36,7 +36,7 @@ func (c *component500) Wait() (err error) {
 }
 
 func TestTimeout_Wait(t *testing.T) {
-	for i:=0; i<compositeTestIterations; i++ {
+	for i := 0; i < compositeTestIterations; i++ {
 		t.Run("ok", func(t *testing.T) {
 			t.Parallel()
 			c1 := newTestingComponent("1", nil, nil, errors.New("1"))
@@ -67,4 +67,3 @@ func TestTimeout_Wait(t *testing.T) {
 		})
 	}
 }
-
