@@ -12,7 +12,8 @@ install:
 - make INSTALL-toolchain
 
 script:
-- make lint test-coverage
+- make lint
+- make test-coverage
 
 after_success:
 - bash <(curl -s https://codecov.io/bash)
