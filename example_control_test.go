@@ -58,13 +58,7 @@ func (c *LayeredControl) Wait() (err error) {
 func ExampleControl_layered() {
 	c := NewLayeredControl(context.Background())
 	c.Open()
-	doneChan := make(chan struct{})
-	go func() {
-		c.Wait()
-		close(doneChan)
-	}()
 	c.Close()
-	<-doneChan
 	c.Wait()
 
 	// Output:

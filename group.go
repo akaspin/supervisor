@@ -25,7 +25,7 @@ func NewGroup(ctx context.Context, components ...Component) (g *Group) {
 		components: components,
 	}
 	g.composite = newComposite(ctx, g.build)
-	return
+	return g
 }
 
 func (g *Group) build(control *compositeControl) {

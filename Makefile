@@ -1,9 +1,25 @@
-##
-## workaround to use vendor path with go 1.11 because
-## Intellij IDEA Go still works horrible with modules
-##
+export GO111MODULE = on
 
-mod-vendor: vendor/modules.txt
+test-race:
+	go test -race ./...
 
-vendor/modules.txt: go.mod
-	GO111MODULE=on go mod vendor
+test-coverage:
+	go test -coverprofile=coverage.txt -covermode=atomic ./...
+
+lint: CHECK-toolchain
+	DIFF=`gofmt -s -d .` && echo "$$DIFF" && test -z "$$DIFF"
+	go vet ./...
+	revive -config revive.toml -formatter friendly -exclude ./vendor/... ./...
+
+.PHONY: INSTALL-toolchain
+INSTALL-toolchain:
+	mkdir -p .tool && cd .tool && \
+		echo "module toolchain" > go.mod && \
+		go get -u github.com/mgechev/revive
+	rm -rf .tool
+
+.PHONY: CHECK-toolchain
+CHECK-toolchain:
+	which revive
+
+.PHONY: lint test

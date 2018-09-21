@@ -3,13 +3,18 @@ language: go
 go:
 - "1.11"
 
-env:
-- GO111MODULE=on
+cache:
+  directories:
+  - /home/travis/gopath/pkg/mod
+  - /home/travis/gopath/bin
 
-install: true
+install:
+- make INSTALL-toolchain
 
 script:
-- go test -race -coverprofile=coverage.txt -covermode=atomic ./...
+- make lint
+- make test-race
+- make test-coverage
 
 after_success:
 - bash <(curl -s https://codecov.io/bash)
