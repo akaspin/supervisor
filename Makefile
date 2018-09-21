@@ -1,10 +1,10 @@
 export GO111MODULE = on
 
-test:
+test-race:
 	go test -race ./...
 
 test-coverage:
-	go test -race -coverprofile=coverage.txt -covermode=atomic ./...
+	go test -coverprofile=coverage.txt -covermode=atomic ./...
 
 lint: CHECK-toolchain
 	DIFF=`gofmt -s -d .` && echo "$$DIFF" && test -z "$$DIFF"
@@ -15,7 +15,7 @@ lint: CHECK-toolchain
 INSTALL-toolchain:
 	mkdir -p .tool && cd .tool && \
 		echo "module toolchain" > go.mod && \
-		go get github.com/mgechev/revive
+		go get -u github.com/mgechev/revive
 	rm -rf .tool
 
 .PHONY: CHECK-toolchain

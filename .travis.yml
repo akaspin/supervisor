@@ -13,6 +13,7 @@ install:
 
 script:
 - make lint
+- make test-race
 - make test-coverage
 
 after_success:
