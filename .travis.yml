@@ -6,6 +6,7 @@ go:
 cache:
   directories:
   - /home/travis/gopath/pkg/mod
+  - /home/travis/gopath/bin
 
 install:
 - make INSTALL-toolchain
