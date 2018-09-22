@@ -1,25 +1,38 @@
+# required to use modules inside GOPATH
 export GO111MODULE = on
 
-test-race:
-	go test -race ./...
+# Use $(eval $(call TOOLCHAIN,<binary>,<package>)) to make pair of
+# INSTALL-<package> and .CHECK-<package> targets. Use INSTALL and .CHECK
+# targets to install or check all tools
 
-test-coverage:
-	go test -coverprofile=coverage.txt -covermode=atomic ./...
-
-lint: CHECK-toolchain
-	DIFF=`gofmt -s -d .` && echo "$$DIFF" && test -z "$$DIFF"
-	go vet ./...
-	revive -config revive.toml -formatter friendly -exclude ./vendor/... ./...
-
-.PHONY: INSTALL-toolchain
-INSTALL-toolchain:
-	mkdir -p .tool && cd .tool && \
+define TOOLCHAIN
+.PHONY: INSTALL-$1
+INSTALL-$1:
+	mkdir -p /tmp/.INSTALL-$1 && cd /tmp/.INSTALL-$1 && \
 		echo "module toolchain" > go.mod && \
-		go get -u github.com/mgechev/revive
-	rm -rf .tool
+		go get -u $2
+	rm -rf /tmp/.INSTALL-$1
+INSTALL:: INSTALL-$1
+.PHONY: .CHECK-$1
+.CHECK-$1:
+	@test -x "`which $1`" || (echo "$1 is not installed. run INSTALL-$1.")
+.CHECK:: .CHECK-$1
+endef
 
-.PHONY: CHECK-toolchain
-CHECK-toolchain:
-	which revive
+test-ci:	## test with race and coverage
+	go test -race -run=^Test -coverprofile=coverage.txt -covermode=atomic ./...
 
-.PHONY: lint test
+assert: ASSERT-fmt ASSERT-vet ASSERT-lint
+
+ASSERT-fmt:
+	DIFF=`gofmt -s -d .` && echo "$$DIFF" && test -z "$$DIFF"
+
+ASSERT-vet:
+	go vet ./...
+
+$(eval $(call TOOLCHAIN,revive,github.com/mgechev/revive))
+ASSERT-lint: .CHECK-revive
+	revive -config revive.toml -formatter friendly ./...
+
+.PHONY: lint test-ci
+
