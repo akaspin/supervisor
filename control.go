@@ -20,6 +20,7 @@ func NewControl(ctx context.Context) (c *Control) {
 	return
 }
 
+// Open sets Control in open state
 func (c *Control) Open() (err error) {
 	atomic.CompareAndSwapUint32(&c.isOpen, 0, 1)
 	return nil
@@ -42,10 +43,12 @@ func (c *Control) Ctx() context.Context {
 	return c.ctx
 }
 
+// IsOpen returns true if Control is opened
 func (c *Control) IsOpen() (ok bool) {
 	return atomic.LoadUint32(&c.isOpen) == 1
 }
 
+// IsClosed returns true if control is closed
 func (c *Control) IsClosed() (ok bool) {
 	select {
 	case <-c.ctx.Done():

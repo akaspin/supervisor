@@ -7,6 +7,7 @@ import (
 )
 
 var (
+	// ErrTimeout returned by Timeout if timeout exceeded
 	ErrTimeout = errors.New("timeout exceeded")
 )
 
