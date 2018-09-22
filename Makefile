@@ -19,14 +19,20 @@ INSTALL:: INSTALL-$1
 .CHECK:: .CHECK-$1
 endef
 
-test-ci:
+test-ci:	## test with race and coverage
 	go test -race -run=^Test -coverprofile=coverage.txt -covermode=atomic ./...
 
-$(eval $(call TOOLCHAIN,revive,github.com/mgechev/revive))
-lint: .CHECK-revive
+assert: ASSERT-fmt ASSERT-vet ASSERT-lint
+
+ASSERT-fmt:
 	DIFF=`gofmt -s -d .` && echo "$$DIFF" && test -z "$$DIFF"
+
+ASSERT-vet:
 	go vet ./...
-	revive -config revive.toml -formatter friendly -exclude ./vendor/... ./...
+
+$(eval $(call TOOLCHAIN,revive,github.com/mgechev/revive))
+ASSERT-lint: .CHECK-revive
+	revive -config revive.toml -formatter friendly ./...
 
 .PHONY: lint test-ci
 
