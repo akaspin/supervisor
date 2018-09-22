@@ -9,12 +9,10 @@ cache:
   - /home/travis/gopath/bin
 
 install:
-- make INSTALL-toolchain
+- make INSTALL
 
 script:
-- make lint
-- make test-race
-- make test-coverage
+- make -j4 lint test-ci
 
 after_success:
 - bash <(curl -s https://codecov.io/bash)
