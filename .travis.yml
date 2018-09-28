@@ -12,7 +12,7 @@ install:
 - make INSTALL
 
 script:
-- make -j4 assert test-ci
+- make assert test-race
 
 after_success:
 - bash <(curl -s https://codecov.io/bash)

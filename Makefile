@@ -19,8 +19,12 @@ INSTALL:: INSTALL-$1
 .CHECK:: .CHECK-$1
 endef
 
-test-ci:	## test with race and coverage
-	go test -race -run=^Test -coverprofile=coverage.txt -covermode=atomic ./...
+dep:
+	go get -u=patch
+	go mod tidy
+
+test-race:	## test with race and coverage
+	go test -race -coverprofile=coverage.txt -covermode=atomic ./...
 
 assert: ASSERT-fmt ASSERT-vet ASSERT-lint
 
