@@ -8,11 +8,8 @@ cache:
   - /home/travis/gopath/pkg/mod
   - /home/travis/gopath/bin
 
-install:
-- make INSTALL
-
 script:
-- make assert test-race
+- make coverage lint
 
 after_success:
 - bash <(curl -s https://codecov.io/bash)

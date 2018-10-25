@@ -1,42 +1,77 @@
-# required to use modules inside GOPATH
-export GO111MODULE = on
 
-# Use $(eval $(call TOOLCHAIN,<binary>,<package>)) to make pair of
-# INSTALL-<package> and .CHECK-<package> targets. Use INSTALL and .CHECK
-# targets to install or check all tools
+# all go sources excluding vendor
+GO_SOURCES = $(shell find . -type f \( -iname '*.go' \) -not -path "./vendor/*" 2>/dev/null)
+.SUFFIXES:
 
-define TOOLCHAIN
-.PHONY: INSTALL-$1
-INSTALL-$1:
-	mkdir -p /tmp/.INSTALL-$1 && cd /tmp/.INSTALL-$1 && \
+# Required to use modules inside GOPATH with Go 1.11. Temporary.
+export GO111MODULE ?= on
+
+##
+## Use $(eval $(call TOOL,<binary>,<package>)) to make .TOOL-<binary> target
+## .TOOL-* targets can be used as dependencies for goals which requires
+## specific binaries. All binaries will be installed to $GOBIN directory.
+## Hint: to install tools to specific directory override GOBIN and PATH
+## OS environment variables.
+##
+
+define TOOL
+.TOOL-$1:
+	test -x "$(shell which $1)" \
+	|| (mkdir -p /tmp/.INSTALL-$1 && cd /tmp/.INSTALL-$1 && \
 		echo "module toolchain" > go.mod && \
-		go get -u $2
-	rm -rf /tmp/.INSTALL-$1
-INSTALL:: INSTALL-$1
-.PHONY: .CHECK-$1
-.CHECK-$1:
-	@test -x "`which $1`" || (echo "$1 is not installed. run INSTALL-$1.")
-.CHECK:: .CHECK-$1
+		go get -u $2 && \
+		rm -rf /tmp/.INSTALL-$1)
+.NOTPARALLEL: .TOOL-$1
 endef
 
-dep:
+##
+## Maintenance
+##
+
+go.mod: $(GO_SOURCES)
+	go mod tidy
+
+mod: $(GO_SOURCES)
 	go get -u=patch
 	go mod tidy
 
-test-race:	## test with race and coverage
-	go test -race -coverprofile=coverage.txt -covermode=atomic ./...
+mod-vendor: go.mod
+	go mod vendor
 
-assert: ASSERT-fmt ASSERT-vet ASSERT-lint
+fmt: $(GO_SOURCES)
+	go fmt ./...
 
-ASSERT-fmt:
-	DIFF=`gofmt -s -d .` && echo "$$DIFF" && test -z "$$DIFF"
+##
+## Testing and lint
+##
 
-ASSERT-vet:
+.PHONY: test bench race
+
+test: go.mod
+	go test -run=Test ./...
+
+coverage: go.mod
+	go test -coverprofile=coverage.txt -covermode=atomic ./...
+
+race: go.mod
+	go test -run=Test -race ./...
+
+examples: go.mod
+	go test -run=Example ./...
+
+bench: go.mod
+	go test -run= -bench=. -benchmem ./...
+
+lint: .ASSERT-fmt .ASSERT-vet .ASSERT-lint
+
+.ASSERT-fmt: $(GO_SOURCES)
+	@DIFF=`gofmt -s -d $^` && echo "$$DIFF" && test -z "$$DIFF"
+
+.ASSERT-vet: $(GO_SOURCES) go.mod
 	go vet ./...
+.NOTPARALLEL: .ASSERT-vet
 
-$(eval $(call TOOLCHAIN,revive,github.com/mgechev/revive))
-ASSERT-lint: .CHECK-revive
-	revive -config revive.toml -formatter friendly ./...
-
-.PHONY: lint test-ci
+$(eval $(call TOOL,revive,github.com/mgechev/revive))
+.ASSERT-lint: .TOOL-revive $(GO_SOURCES)
+	revive -config revive.toml -formatter friendly -exclude ./vendor/... ./...
 
