@@ -1,12 +1,8 @@
-action "action a" {
-  uses = "./.github/mod-outdated/"
-}
-
-workflow "test" {
+workflow "check" {
   on = "push"
-  resolves = ["Go outtdated modules check"]
+  resolves = ["Go outdated modules"]
 }
 
-action "Go outtdated modules check" {
+action "Go outdated modules" {
   uses = "./.github/mod-outdated"
 }
