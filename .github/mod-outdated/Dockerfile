@@ -1,5 +1,7 @@
 FROM golang:alpine
 
+RUN apk --no-cache add git
+
 LABEL "name"="Go outtdated modules check"
 LABEL "maintainer"="Aleksandr Dorofeev <aka.spn@gmail.com>"
 LABEL "version"="1.0.0"
