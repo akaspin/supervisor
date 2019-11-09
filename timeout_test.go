@@ -3,10 +3,11 @@ package supervisor_test
 import (
 	"context"
 	"errors"
-	"github.com/akaspin/supervisor"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/akaspin/supervisor"
+	"github.com/stretchr/testify/assert"
 )
 
 type component500 struct {

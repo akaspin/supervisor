@@ -1,0 +1,5 @@
+.lint-shadow: $(TOOLS)/golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow $(SOURCES)
+	go vet -vettool=$< ./...
+.NOTPARALLEL: .lint-shadow
+
+lint:: .lint-shadow
