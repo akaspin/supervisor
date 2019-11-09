@@ -17,7 +17,7 @@ type Control struct {
 func NewControl(ctx context.Context) (c *Control) {
 	c = &Control{}
 	c.ctx, c.cancel = context.WithCancel(ctx)
-	return
+	return c
 }
 
 // Open sets Control in open state
