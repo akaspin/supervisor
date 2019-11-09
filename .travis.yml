@@ -1,7 +1,9 @@
 language: go
 
 go:
-- 1.11.2
+- '1.11.6'
+- '1.12'
+- '1.13'
 
 cache:
   directories:
@@ -10,10 +12,7 @@ cache:
   - "$HOME/.cache/go-build"
 
 script:
-- make coverage lint
-
-after_success:
-- bash <(curl -s https://codecov.io/bash)
+- make lint race-nocache
 
 branches:
   only:

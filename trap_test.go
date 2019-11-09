@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/akaspin/supervisor"
-	"github.com/stretchr/testify/assert"
 	"strconv"
 	"testing"
+
+	"github.com/akaspin/supervisor"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestTrap_Wait(t *testing.T) {

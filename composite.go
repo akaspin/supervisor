@@ -43,7 +43,7 @@ func newComposite(ctx context.Context, handler func(control *compositeControl)) 
 }
 
 // Open blocks until all components are opened. This method should be called
-// before Close(). Otherwise Open() will return error. If Open() method of one
+// before Close(). Otherwise, Open() will return error. If Open() method of one
 // of components returns error all opened components will be closed. This
 // method may be called many times and will return equal results. It's
 // guaranteed that Open() method of all components will be called only once.

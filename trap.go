@@ -37,7 +37,7 @@ func (*Trap) Open() (err error) {
 // Close closes trap
 func (t *Trap) Close() (err error) {
 	t.cancel()
-	return
+	return nil
 }
 
 // Wait returns last accepted error

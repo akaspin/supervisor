@@ -1,0 +1,5 @@
+REVIVE_CONFIG ?= $(or $(wildcard revive.toml),$(MAKE_DIR)/revive.toml)
+.lint-revive: $(TOOLS)/github.com/mgechev/revive $(REVIVE_CONFIG) $(SOURCES)	## run revive linter
+	$< -config $(REVIVE_CONFIG) -formatter friendly -exclude ./vendor/... $(REVIVELINTER_EXCLUDES) ./...
+
+lint:: .lint-revive
